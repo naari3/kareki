@@ -1,4 +1,4 @@
-use std::io::{self, Error, Read, Seek, Write};
+use std::io::{self, Error, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
@@ -8,6 +8,56 @@ use types::string::{decode_string, encode_string};
 use types::varint::{decode_varint, encode_varint};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
+
+#[derive(Debug, Serialize)]
+pub struct Description {
+    pub text: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Players {
+    pub max: i32,
+    pub online: i32,
+    pub sample: Option<Vec<Sample>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Sample {
+    pub name: String,
+    pub id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Version {
+    pub name: String,
+    pub protocol: i32,
+}
+
+#[derive(Debug)]
+pub struct StatusResponse {
+    pub description: Description,
+    pub favicon: Option<String>,
+    pub players: Players,
+    pub version: Version,
+}
+
+impl Serialize for StatusResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("StatusResponse", 3)?;
+        s.serialize_field("description", &self.description)?;
+        if self.favicon.is_some() {
+            s.serialize_field("favicon", &self.favicon)?;
+        }
+        s.serialize_field("players", &self.players)?;
+        s.serialize_field("version", &self.version)?;
+        s.end()
+    }
+}
 
 fn handler(mut stream: TcpStream) -> Result<(), Error> {
     println!("Connection from {}", stream.peer_addr()?);
@@ -38,7 +88,23 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             let mut r = io::Cursor::new(vec![] as Vec<u8>);
             let mut dst = io::Cursor::new(vec![] as Vec<u8>);
 
-            let json_response = r#"{"description":{"text":"A Minecraft Server"},"players":{"max":20,"online":12345},"version":{"name":"1.15.2","protocol":578}}"#;
+            let status_response = StatusResponse {
+                description: Description {
+                    text: "Yo this was implemented by naari3 @naari_ @_naari_".to_string(),
+                },
+                players: Players {
+                    max: 12345,
+                    online: 126534640, // Japan population
+                    sample: Some(vec![]),
+                },
+                favicon: None,
+                version: Version {
+                    name: "1.15.2".to_string(),
+                    protocol: 578,
+                },
+            };
+
+            let json_response = serde_json::to_string(&status_response)?;
 
             println!("will send: {}", json_response);
 
