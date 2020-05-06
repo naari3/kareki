@@ -1,5 +1,5 @@
 [package]
-name = "rust_tcp_test"
+name = "kareki"
 version = "0.1.0"
 authors = ["naari3 <naari.named@gmail.com>"]
 edition = "2018"

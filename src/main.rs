@@ -59,34 +59,73 @@ impl Serialize for StatusResponse {
     }
 }
 
-fn handler(mut stream: TcpStream) -> Result<(), Error> {
-    println!("Connection from {}", stream.peer_addr()?);
-    let mut state = 0;
-    loop {
-        println!("state: {}", state);
+enum Packet {
+    Handshake {
+        protocol_version: i32,
+        server_address: String,
+        server_port: u16,
+        next_state: NextState,
+    },
+    Request,
+    Ping {
+        payload: u64,
+    },
+}
 
-        let packet_size = decode_varint(&mut stream)? as u32;
-        let packet_id = decode_varint(&mut stream)? as u32;
-        println!("packet size: {}, packet_id: {}", packet_size, packet_id);
+enum NextState {
+    Status,
+    Login,
+}
 
-        if state == 0 && packet_id == 0 {
-            println!("get handshake");
-            let protocol_version = decode_varint(&mut stream)?;
-            let server_address = decode_string(&mut stream)?;
-            let server_port = stream.read_u16::<BigEndian>()?;
-            let next_state = decode_varint(&mut stream)?;
+fn read_handshake_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
+    let packet_size = decode_varint(stream)? as u32;
+    let packet_id = decode_varint(stream)? as u32;
+    println!("packet size: {}, packet_id: {}", packet_size, packet_id);
 
-            println!(
-                "protocol_version: {}, server_address: {}, server_port: {}, next_state: {}",
-                protocol_version, server_address, server_port, next_state
-            );
+    println!("get handshake");
+    let protocol_version = decode_varint(stream)?;
+    let server_address = decode_string(stream)?;
+    let server_port = stream.read_u16::<BigEndian>()?;
+    let next_state = match decode_varint(stream)? {
+        1 => NextState::Status,
+        2 => NextState::Login,
+        _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
+    };
 
-            state = next_state;
-            stream.flush()?;
-        } else if state == 1 && packet_id == 0 {
+    Ok(Packet::Handshake {
+        protocol_version: protocol_version,
+        server_address: server_address,
+        server_port: server_port,
+        next_state: next_state,
+    })
+}
+
+fn read_status_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
+    let packet_size = decode_varint(stream)? as u32;
+    let packet_id = decode_varint(stream)? as u32;
+    println!("packet size: {}, packet_id: {}", packet_size, packet_id);
+
+    match packet_id {
+        0 => return Ok(Packet::Request),
+        1 => {
+            return Ok(Packet::Ping {
+                payload: stream.read_u64::<BigEndian>()?,
+            })
+        }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet id",
+            ))
+        }
+    }
+}
+
+fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
+    match read_status_packet(stream)? {
+        Packet::Request => {
             println!("get status request");
             let mut r = io::Cursor::new(vec![] as Vec<u8>);
-            let mut dst = io::Cursor::new(vec![] as Vec<u8>);
 
             let status_response = StatusResponse {
                 description: Description {
@@ -113,30 +152,69 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
 
             println!("packet size: {}", r.get_ref().len() as i32);
 
-            encode_varint(&(r.get_ref().len() as i32), &mut dst)?;
-            dst.write_all(r.get_ref())?;
+            encode_varint(&(r.get_ref().len() as i32), stream)?;
+            stream.write_all(r.get_ref())?;
 
-            stream.write_all(&dst.get_ref())?;
             println!("sent status");
             stream.flush()?;
-        } else if state == 1 && packet_id == 1 {
+        }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet id",
+            ))
+        }
+    }
+    Ok(())
+}
+
+fn slp_ping(stream: &mut TcpStream) -> Result<(), Error> {
+    match read_status_packet(stream)? {
+        Packet::Ping { payload } => {
             println!("get ping");
-            let payload = stream.read_u64::<BigEndian>()?;
 
             let mut r = io::Cursor::new(vec![] as Vec<u8>);
-            let mut dst = io::Cursor::new(vec![] as Vec<u8>);
 
             encode_varint(&1, &mut r)?;
             r.write_u64::<BigEndian>(payload)?;
 
-            encode_varint(&(r.get_ref().len() as i32), &mut dst)?;
-            dst.write_all(&r.get_ref())?;
+            encode_varint(&(r.get_ref().len() as i32), stream)?;
+            stream.write_all(&r.get_ref())?;
 
-            stream.write_all(&dst.get_ref())?;
             println!("sent pong");
             stream.flush()?;
         }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet id",
+            ))
+        }
     }
+    Ok(())
+}
+
+fn handler(mut stream: TcpStream) -> Result<(), Error> {
+    println!("Connection from {}", stream.peer_addr()?);
+
+    let next_state = match read_handshake_packet(&mut stream)? {
+        Packet::Handshake { next_state, .. } => next_state,
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet",
+            ))
+        }
+    };
+    match next_state {
+        NextState::Status => {
+            slp_status(&mut stream)?;
+            slp_ping(&mut stream)?;
+        }
+        NextState::Login => {}
+    };
+
+    Ok(())
 }
 
 fn main() {
