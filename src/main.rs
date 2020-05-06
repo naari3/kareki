@@ -8,13 +8,13 @@ mod types;
 
 use slp::{slp_ping, slp_status};
 
-use packet::{read_handshake_packet, NextState, Packet};
+use packet::{read_handshake_packet, NextState, HandshakePacket};
 
 fn handler(mut stream: TcpStream) -> Result<(), Error> {
     println!("Connection from {}", stream.peer_addr()?);
 
     let next_state = match read_handshake_packet(&mut stream)? {
-        Packet::Handshake { next_state, .. } => next_state,
+        HandshakePacket::Handshake { next_state, .. } => next_state,
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

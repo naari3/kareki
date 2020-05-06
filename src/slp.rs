@@ -9,7 +9,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use super::types::string::encode_string;
 use super::types::varint::encode_varint;
 
-use super::packet::{Packet, read_status_packet};
+use super::packet::{StatusPacket, read_status_packet};
 
 #[derive(Debug, Serialize)]
 pub struct Description {
@@ -61,7 +61,7 @@ impl Serialize for StatusResponse {
 
 pub fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
     match read_status_packet(stream)? {
-        Packet::Request => {
+        StatusPacket::Request => {
             println!("get status request");
             let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
@@ -108,7 +108,7 @@ pub fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
 
 pub fn slp_ping(stream: &mut TcpStream) -> Result<(), Error> {
     match read_status_packet(stream)? {
-        Packet::Ping { payload } => {
+        StatusPacket::Ping { payload } => {
             println!("get ping");
 
             let mut r = io::Cursor::new(vec![] as Vec<u8>);

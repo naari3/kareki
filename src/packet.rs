@@ -7,13 +7,16 @@ use super::types::varint::decode_varint;
 use byteorder::{BigEndian, ReadBytesExt};
 
 
-pub enum Packet {
+pub enum HandshakePacket {
     Handshake {
         protocol_version: i32,
         server_address: String,
         server_port: u16,
         next_state: NextState,
     },
+}
+
+pub enum StatusPacket {
     Request,
     Ping {
         payload: u64,
@@ -32,7 +35,7 @@ fn read_packet_meta(stream: &mut TcpStream) -> Result<(u32, u32), Error> {
     Ok((packet_size, packet_id))
 }
 
-pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
+pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<HandshakePacket, Error> {
     let (_, _) = read_packet_meta(stream)?;
 
     println!("get handshake");
@@ -45,7 +48,7 @@ pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
         _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
     };
 
-    Ok(Packet::Handshake {
+    Ok(HandshakePacket::Handshake {
         protocol_version: protocol_version,
         server_address: server_address,
         server_port: server_port,
@@ -53,13 +56,13 @@ pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
     })
 }
 
-pub fn read_status_packet(stream: &mut TcpStream) -> Result<Packet, Error> {
+pub fn read_status_packet(stream: &mut TcpStream) -> Result<StatusPacket, Error> {
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
-        0 => return Ok(Packet::Request),
+        0 => return Ok(StatusPacket::Request),
         1 => {
-            return Ok(Packet::Ping {
+            return Ok(StatusPacket::Ping {
                 payload: stream.read_u64::<BigEndian>()?,
             })
         }
