@@ -31,8 +31,11 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             slp_ping(&mut stream)?;
         }
         NextState::Login => {
+            use uuid::Uuid;
+
             let name = login::login_start(&mut stream)?;
             println!("login attempt: {}", name);
+            login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
             login::disconnect(&mut stream)?;
         }
     };
