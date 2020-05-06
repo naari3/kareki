@@ -23,6 +23,12 @@ pub enum StatusPacket {
     },
 }
 
+pub enum LoginPacket {
+    LoginStart {
+        name: String
+    }
+}
+
 pub enum NextState {
     Status,
     Login,
@@ -66,6 +72,22 @@ pub fn read_status_packet(stream: &mut TcpStream) -> Result<StatusPacket, Error>
                 payload: stream.read_u64::<BigEndian>()?,
             })
         }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet id",
+            ))
+        }
+    }
+}
+
+pub fn read_login_packet(stream: &mut TcpStream) -> Result<LoginPacket, Error> {
+    let (_, packet_id) = read_packet_meta(stream)?;
+
+    match packet_id {
+        0 => return Ok(LoginPacket::LoginStart {
+            name: decode_string(stream)?
+        }),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

@@ -3,12 +3,15 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 mod packet;
-mod slp;
 mod types;
+
+mod slp;
+
+mod login;
 
 use slp::{slp_ping, slp_status};
 
-use packet::{read_handshake_packet, NextState, HandshakePacket};
+use packet::{read_handshake_packet, HandshakePacket, NextState};
 
 fn handler(mut stream: TcpStream) -> Result<(), Error> {
     println!("Connection from {}", stream.peer_addr()?);
@@ -27,7 +30,11 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             slp_status(&mut stream)?;
             slp_ping(&mut stream)?;
         }
-        NextState::Login => {}
+        NextState::Login => {
+            let name = login::login_start(&mut stream)?;
+            println!("login attempt: {}", name);
+            login::disconnect(&mut stream)?;
+        }
     };
 
     println!("==================================");
