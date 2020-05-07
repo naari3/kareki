@@ -41,7 +41,11 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             let verify_token = vec![0u8, 123, 212, 123];
 
             login::encryption_request(&mut stream, &pubkey, &verify_token)?;
-            login::encryption_response(&mut stream, &rsa, &name)?;
+            let (name, id, props, key) = login::encryption_response(&mut stream, &rsa, &name)?;
+            println!(
+                "name: {}, id: {}, props: {:?}, key: {:?}",
+                name, id, props, key
+            );
             // login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
         }
     };
@@ -50,7 +54,8 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let listener = TcpListener::bind("0.0.0.0:25565").expect("Error. failed to bind.");
     for streams in listener.incoming() {
         match streams {

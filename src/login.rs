@@ -9,7 +9,7 @@ use super::packet::{read_login_packet, LoginPacket};
 use uuid::Uuid;
 
 use openssl::pkey::Private;
-use openssl::rsa::{Rsa, Padding};
+use openssl::rsa::{Padding, Rsa};
 
 pub fn disconnect(stream: &mut TcpStream) -> Result<(), Error> {
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
@@ -63,7 +63,11 @@ pub fn encryption_request(
     Ok(())
 }
 
-pub fn encryption_response(stream: &mut TcpStream, rsa: &Rsa<Private>, name: &String) -> Result<(), Error> {
+pub fn encryption_response(
+    stream: &mut TcpStream,
+    rsa: &Rsa<Private>,
+    name: &String,
+) -> Result<(String, Uuid, Vec<mojang_api::ProfileProperty>, [u8; 16]), Error> {
     println!("receive encryption response");
     match read_login_packet(stream)? {
         LoginPacket::EncryptionResponse {
@@ -71,6 +75,8 @@ pub fn encryption_response(stream: &mut TcpStream, rsa: &Rsa<Private>, name: &St
             verify_token,
             ..
         } => {
+            // use mojang_api::ServerAuthResponse;
+
             let mut decoded_shared_secret = vec![0; rsa.size() as usize];
             rsa.private_decrypt(&shared_secret, &mut decoded_shared_secret, Padding::PKCS1)?;
             let mut decoded_verify_token = vec![0; rsa.size() as usize];
@@ -82,6 +88,22 @@ pub fn encryption_response(stream: &mut TcpStream, rsa: &Rsa<Private>, name: &St
             for (i, x) in decoded_shared_secret[..16].iter().enumerate() {
                 key[i] = *x;
             }
+
+            let server_hash = mojang_api::server_hash("", key, &rsa.public_key_to_der()?);
+            let auth_result = mojang_api::server_auth(&server_hash, name);
+
+            let mut rt = tokio::runtime::Runtime::new()?;
+            match rt.block_on(auth_result) {
+                Ok(auth) => {
+                    return Ok((auth.name, auth.id, auth.properties, key));
+                }
+                Err(e) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("auth failed {:?}", e),
+                    ))
+                }
+            };
         }
         _ => {
             return Err(io::Error::new(
@@ -90,7 +112,6 @@ pub fn encryption_response(stream: &mut TcpStream, rsa: &Rsa<Private>, name: &St
             ))
         }
     };
-    Ok(())
 }
 
 pub fn login_success(stream: &mut TcpStream, uuid: &Uuid, username: &String) -> Result<(), Error> {

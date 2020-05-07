@@ -13,3 +13,5 @@ serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "0.8", features = ["v4"] }
 openssl-sys = "0.9"
 openssl = "0.10"
+tokio = { version = "0.2", features = ["full"] }
+mojang-api = "0.6"
