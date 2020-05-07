@@ -6,7 +6,6 @@ use super::types::varint::decode_varint;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-
 pub enum HandshakePacket {
     Handshake {
         protocol_version: i32,
@@ -18,15 +17,19 @@ pub enum HandshakePacket {
 
 pub enum StatusPacket {
     Request,
-    Ping {
-        payload: u64,
-    },
+    Ping { payload: u64 },
 }
 
 pub enum LoginPacket {
     LoginStart {
-        name: String
-    }
+        name: String,
+    },
+    EncryptionResponse {
+        shared_secret_length: i32,
+        shared_secret: Vec<u8>,
+        verify_token_length: i32,
+        verify_token: Vec<u8>,
+    },
 }
 
 pub enum NextState {
@@ -85,9 +88,31 @@ pub fn read_login_packet(stream: &mut TcpStream) -> Result<LoginPacket, Error> {
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
-        0 => return Ok(LoginPacket::LoginStart {
-            name: decode_string(stream)?
-        }),
+        0 => {
+            return Ok(LoginPacket::LoginStart {
+                name: decode_string(stream)?,
+            })
+        }
+        1 => {
+            let shared_secret_length = decode_varint(stream)?;
+            let mut shared_secret = vec![];
+            for _ in 0..shared_secret_length {
+                shared_secret.push(stream.read_u8()?);
+            }
+
+            let verify_token_length = decode_varint(stream)?;
+            let mut verify_token = vec![];
+            for _ in 0..verify_token_length {
+                verify_token.push(stream.read_u8()?);
+            }
+
+            return Ok(LoginPacket::EncryptionResponse {
+                shared_secret_length,
+                shared_secret,
+                verify_token_length,
+                verify_token,
+            });
+        }
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

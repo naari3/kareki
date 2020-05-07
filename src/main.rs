@@ -31,12 +31,18 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             slp_ping(&mut stream)?;
         }
         NextState::Login => {
-            use uuid::Uuid;
+            // use uuid::Uuid;
 
             let name = login::login_start(&mut stream)?;
             println!("login attempt: {}", name);
-            login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
-            login::disconnect(&mut stream)?;
+
+            let rsa = openssl::rsa::Rsa::generate(1024).unwrap();
+            let pubkey = rsa.public_key_to_der()?;
+            let verify_token = vec![0u8, 123, 212, 123];
+
+            login::encryption_request(&mut stream, &pubkey, &verify_token)?;
+            login::encryption_response(&mut stream, &rsa, &name)?;
+            // login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
         }
     };
 
