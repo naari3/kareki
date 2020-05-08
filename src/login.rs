@@ -2,8 +2,7 @@ use std::io::{self, Error, Write};
 
 use super::mcstream::McStream;
 
-use super::types::varint::Var;
-use super::types::arr::Arr;
+use crate::types::{Var, Arr};
 
 use super::packet::{read_login_packet, serverbound::LoginPacket};
 
