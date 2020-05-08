@@ -4,8 +4,6 @@ use crate::types::varint::Var;
 use crate::types::arr::Arr;
 use crate::protocol::Protocol;
 
-use byteorder::{BigEndian, ReadBytesExt};
-
 pub mod clientbound {
     pub enum StatusPacket {
         Response {
@@ -78,7 +76,7 @@ pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, E
     println!("get handshake");
     let protocol_version = <Var<i32>>::proto_decode(stream)?;
     let server_address = String::proto_decode(stream)?;
-    let server_port = stream.read_u16::<BigEndian>()?;
+    let server_port = u16::proto_decode(stream)?;
     let next_state = match <Var<i32>>::proto_decode(stream)? {
         1 => NextState::Status,
         2 => NextState::Login,
@@ -100,7 +98,7 @@ pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> 
         0 => return Ok(StatusPacket::Request),
         1 => {
             return Ok(StatusPacket::Ping {
-                payload: stream.read_u64::<BigEndian>()?,
+                payload: u64::proto_decode(stream)?,
             })
         }
         _ => {
