@@ -55,3 +55,23 @@ impl_protocol!(i64, 8, write_i64, read_i64);
 impl_protocol!(u64, 8, write_u64, read_u64);
 impl_protocol!(f32, 4, write_f32, read_f32);
 impl_protocol!(f64, 8, write_f64, read_f64);
+
+impl Protocol for bool {
+    type Clean = bool;
+
+    fn proto_len(_: &bool) -> usize { 1 }
+
+    fn proto_encode(value: &bool, dst: &mut dyn Write) -> io::Result<()> {
+        dst.write_u8(if *value { 1 } else { 0 })?;
+        Ok(())
+    }
+
+    fn proto_decode(src: &mut dyn Read) -> io::Result<bool> {
+        let value = src.read_u8()?;
+        if value > 1 {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, &format!("Invalid bool value, expecting 0 or 1, got {}", value)[..]))
+        } else {
+            Ok(value == 1)
+        }
+    }
+}

@@ -54,6 +54,17 @@ pub mod serverbound {
         },
     }
 
+    pub enum PlayPacket {
+        ClientSettings {
+            locale: String,
+            view_distance: u8,
+            chat_mode: i32,
+            chat_colors: bool,
+            displayed_skin_parts: u8,
+            main_hand: i32,
+        }
+    }
+
     pub enum NextState {
         Status,
         Login,
@@ -110,7 +121,6 @@ pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> 
 }
 
 pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
-    use crate::protocol::Protocol;
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
@@ -127,6 +137,29 @@ pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
                 shared_secret,
                 verify_token,
             });
+        }
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid packet id",
+            ))
+        }
+    }
+}
+
+pub fn read_play_packet(stream: &mut dyn Read) -> Result<PlayPacket, Error> {
+    let (_, packet_id) = read_packet_meta(stream)?;
+
+    match packet_id {
+        5 => {
+            return Ok(PlayPacket::ClientSettings {
+                locale: String::proto_decode(stream)?,
+                view_distance: u8::proto_decode(stream)?,
+                chat_mode: <Var<i32>>::proto_decode(stream)?,
+                chat_colors: bool::proto_decode(stream)?,
+                displayed_skin_parts: u8::proto_decode(stream)?,
+                main_hand: <Var<i32>>::proto_decode(stream)?,
+            })
         }
         _ => {
             return Err(io::Error::new(

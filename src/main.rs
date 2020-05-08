@@ -9,6 +9,7 @@ mod types;
 
 mod login;
 mod slp;
+mod play;
 
 use slp::{slp_ping, slp_status};
 
@@ -50,8 +51,10 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             stream.set_encryptor(&key);
 
             login::set_compression(&mut stream)?;
-
             login::login_success(&mut stream, &id, &name)?;
+
+            play::join_game(&mut stream)?;
+            play::client_settings(&mut stream);
         }
     };
 
