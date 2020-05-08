@@ -5,6 +5,34 @@ use super::types::varint::decode_varint;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
+pub mod clientbound {
+    pub enum StatusPacket {
+        Response {
+            json_length: i32,
+            json_response: String,
+        },
+        Pong {
+            payload: u64,
+        },
+    }
+    pub enum Login {
+        Disconnect {
+            chat: String,
+        },
+        EncryptionRequest {
+            server_id: String,
+            public_key_length: i32,
+            public_key: Vec<u8>,
+            verify_token_length: i32,
+            verify_token: Vec<u8>,
+        },
+        LoginSuccess {
+            uuid: String,
+            username: String,
+        },
+    }
+}
+
 pub mod serverbound {
     pub enum HandshakePacket {
         Handshake {
