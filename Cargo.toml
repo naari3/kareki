@@ -15,3 +15,6 @@ openssl-sys = "0.9"
 openssl = "0.10"
 tokio = { version = "0.2", features = ["full"] }
 mojang-api = "0.6"
+aes = "0.3"
+cfb8 = "0.3"
+bufstream = "0.1"

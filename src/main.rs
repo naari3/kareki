@@ -2,20 +2,27 @@ use std::io::{self, Error};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
+mod mcstream;
 mod packet;
 mod types;
 
-mod slp;
-
 mod login;
+mod slp;
 
 use slp::{slp_ping, slp_status};
 
 use packet::{read_handshake_packet, HandshakePacket, NextState};
 
-fn handler(mut stream: TcpStream) -> Result<(), Error> {
-    println!("Connection from {}", stream.peer_addr()?);
+use aes::Aes128;
+use cfb8::stream_cipher::NewStreamCipher;
+use cfb8::Cfb8;
 
+type AesCfb8 = Cfb8<Aes128>;
+
+use mcstream::McStream;
+
+fn handler(stream: TcpStream) -> Result<(), Error> {
+    let mut stream = McStream::new(stream);
     let next_state = match read_handshake_packet(&mut stream)? {
         HandshakePacket::Handshake { next_state, .. } => next_state,
         _ => {
@@ -31,8 +38,6 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
             slp_ping(&mut stream)?;
         }
         NextState::Login => {
-            // use uuid::Uuid;
-
             let name = login::login_start(&mut stream)?;
             println!("login attempt: {}", name);
 
@@ -46,6 +51,9 @@ fn handler(mut stream: TcpStream) -> Result<(), Error> {
                 "name: {}, id: {}, props: {:?}, key: {:?}",
                 name, id, props, key
             );
+
+            let encryptor = AesCfb8::new_var(&key, &key).unwrap();
+            let decryptor = AesCfb8::new_var(&key, &key).unwrap();
             // login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
         }
     };
@@ -61,6 +69,7 @@ async fn main() {
         match streams {
             Err(e) => eprintln!("error: {}", e),
             Ok(stream) => {
+                println!("connection from {:?}", stream.peer_addr());
                 thread::spawn(move || {
                     handler(stream).unwrap_or_else(|error| eprintln!("{:?}", error));
                 });

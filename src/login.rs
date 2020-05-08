@@ -1,5 +1,6 @@
 use std::io::{self, Error, Write};
-use std::net::TcpStream;
+
+use super::mcstream::McStream;
 
 use super::types::string::encode_string;
 use super::types::varint::encode_varint;
@@ -11,7 +12,7 @@ use uuid::Uuid;
 use openssl::pkey::Private;
 use openssl::rsa::{Padding, Rsa};
 
-pub fn disconnect(stream: &mut TcpStream) -> Result<(), Error> {
+pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
     encode_varint(&0, &mut r)?; // packet_id: 0
@@ -24,7 +25,7 @@ pub fn disconnect(stream: &mut TcpStream) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn login_start(stream: &mut TcpStream) -> Result<String, Error> {
+pub fn login_start(stream: &mut McStream) -> Result<String, Error> {
     match read_login_packet(stream)? {
         LoginPacket::LoginStart { name } => {
             return Ok(name);
@@ -39,7 +40,7 @@ pub fn login_start(stream: &mut TcpStream) -> Result<String, Error> {
 }
 
 pub fn encryption_request(
-    stream: &mut TcpStream,
+    stream: &mut McStream,
     pubkey: &Vec<u8>,
     verify_token: &Vec<u8>,
 ) -> Result<(), Error> {
@@ -58,13 +59,14 @@ pub fn encryption_request(
     dst.write_all(r.get_ref())?;
 
     stream.write_all(dst.get_ref())?;
+    stream.flush()?;
 
     println!("sent encrypted request");
     Ok(())
 }
 
 pub fn encryption_response(
-    stream: &mut TcpStream,
+    stream: &mut McStream,
     rsa: &Rsa<Private>,
     name: &String,
 ) -> Result<(String, Uuid, Vec<mojang_api::ProfileProperty>, [u8; 16]), Error> {
@@ -114,9 +116,10 @@ pub fn encryption_response(
     };
 }
 
-pub fn login_success(stream: &mut TcpStream, uuid: &Uuid, username: &String) -> Result<(), Error> {
+pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> Result<(), Error> {
     stream.write_all(uuid.as_bytes())?;
     encode_string(username, stream)?;
+    stream.flush()?;
 
     println!("login successful");
     Ok(())

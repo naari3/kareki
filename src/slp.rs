@@ -1,10 +1,11 @@
 use std::io::{self, Error, Write};
-use std::net::TcpStream;
 
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
 use byteorder::{BigEndian, WriteBytesExt};
+
+use super::mcstream::McStream;
 
 use super::types::string::encode_string;
 use super::types::varint::encode_varint;
@@ -59,7 +60,7 @@ impl Serialize for StatusResponse {
     }
 }
 
-pub fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
+pub fn slp_status(stream: &mut McStream) -> Result<(), Error> {
     match read_status_packet(stream)? {
         StatusPacket::Request => {
             println!("get status request");
@@ -93,8 +94,8 @@ pub fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
             encode_varint(&(r.get_ref().len() as i32), stream)?;
             stream.write_all(r.get_ref())?;
 
-            println!("sent status");
             stream.flush()?;
+            println!("sent status");
         }
         _ => {
             return Err(io::Error::new(
@@ -106,7 +107,7 @@ pub fn slp_status(stream: &mut TcpStream) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn slp_ping(stream: &mut TcpStream) -> Result<(), Error> {
+pub fn slp_ping(stream: &mut McStream) -> Result<(), Error> {
     match read_status_packet(stream)? {
         StatusPacket::Ping { payload } => {
             println!("get ping");

@@ -1,5 +1,4 @@
-use std::io::{self, Error};
-use std::net::TcpStream;
+use std::io::{self, Error, Read};
 
 use super::types::string::decode_string;
 use super::types::varint::decode_varint;
@@ -37,14 +36,14 @@ pub enum NextState {
     Login,
 }
 
-fn read_packet_meta(stream: &mut TcpStream) -> Result<(u32, u32), Error> {
+fn read_packet_meta(stream: &mut dyn Read) -> Result<(u32, u32), Error> {
     let packet_size = decode_varint(stream)? as u32;
     let packet_id = decode_varint(stream)? as u32;
     println!("packet size: {}, packet_id: {}", packet_size, packet_id);
     Ok((packet_size, packet_id))
 }
 
-pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<HandshakePacket, Error> {
+pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, Error> {
     let (_, _) = read_packet_meta(stream)?;
 
     println!("get handshake");
@@ -65,7 +64,7 @@ pub fn read_handshake_packet(stream: &mut TcpStream) -> Result<HandshakePacket, 
     })
 }
 
-pub fn read_status_packet(stream: &mut TcpStream) -> Result<StatusPacket, Error> {
+pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> {
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
@@ -84,7 +83,7 @@ pub fn read_status_packet(stream: &mut TcpStream) -> Result<StatusPacket, Error>
     }
 }
 
-pub fn read_login_packet(stream: &mut TcpStream) -> Result<LoginPacket, Error> {
+pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
