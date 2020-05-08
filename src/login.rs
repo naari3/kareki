@@ -3,6 +3,7 @@ use std::io::{self, Error, Write};
 use super::mcstream::McStream;
 
 use super::types::varint::Var;
+use super::types::arr::Arr;
 
 use super::packet::{read_login_packet, serverbound::LoginPacket};
 
@@ -51,10 +52,8 @@ pub fn encryption_request(
     <Var<i32>>::proto_encode(&1, &mut r)?; // packet_id: 1
 
     String::proto_encode(&"".to_string(), &mut r)?;
-    <Var<i32>>::proto_encode(&(pubkey.len() as i32), &mut r)?;
-    r.write(&pubkey)?;
-    <Var<i32>>::proto_encode(&(verify_token.len() as i32), &mut r)?;
-    r.write(&verify_token)?;
+    <Arr<Var<i32>, u8>>::proto_encode(&pubkey, &mut r)?;
+    <Arr<Var<i32>, u8>>::proto_encode(&verify_token, &mut r)?;
 
     <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), &mut dst)?;
     dst.write_all(r.get_ref())?;

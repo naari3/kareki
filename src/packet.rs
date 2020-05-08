@@ -1,7 +1,8 @@
 use std::io::{self, Error, Read};
 
-use crate::protocol::Protocol;
 use crate::types::varint::Var;
+use crate::types::arr::Arr;
+use crate::protocol::Protocol;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -21,9 +22,7 @@ pub mod clientbound {
         },
         EncryptionRequest {
             server_id: String,
-            public_key_length: i32,
             public_key: Vec<u8>,
-            verify_token_length: i32,
             verify_token: Vec<u8>,
         },
         LoginSuccess {
@@ -53,9 +52,7 @@ pub mod serverbound {
             name: String,
         },
         EncryptionResponse {
-            shared_secret_length: i32,
             shared_secret: Vec<u8>,
-            verify_token_length: i32,
             verify_token: Vec<u8>,
         },
     }
@@ -116,6 +113,7 @@ pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> 
 }
 
 pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
+    use crate::protocol::Protocol;
     let (_, packet_id) = read_packet_meta(stream)?;
 
     match packet_id {
@@ -125,22 +123,11 @@ pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
             })
         }
         1 => {
-            let shared_secret_length = <Var<i32>>::proto_decode(stream)?;
-            let mut shared_secret = vec![];
-            for _ in 0..shared_secret_length {
-                shared_secret.push(stream.read_u8()?);
-            }
-
-            let verify_token_length = <Var<i32>>::proto_decode(stream)?;
-            let mut verify_token = vec![];
-            for _ in 0..verify_token_length {
-                verify_token.push(stream.read_u8()?);
-            }
+            let shared_secret = <Arr<Var<i32>, u8>>::proto_decode(stream)?;
+            let verify_token = <Arr<Var<i32>, u8>>::proto_decode(stream)?;
 
             return Ok(LoginPacket::EncryptionResponse {
-                shared_secret_length,
                 shared_secret,
-                verify_token_length,
                 verify_token,
             });
         }

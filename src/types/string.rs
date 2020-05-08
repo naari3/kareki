@@ -7,6 +7,11 @@ use crate::protocol::Protocol;
 impl Protocol for String {
     type Clean = String;
 
+    fn proto_len(value: &String) -> usize {
+        let str_len = value.len();
+        <Var<i32> as Protocol>::proto_len(&(str_len as i32)) + str_len
+    }
+
     fn proto_encode(value: &String, dst: &mut dyn Write) -> io::Result<()> {
         let str_len = value.len() as i32;
         <Var<i32>>::proto_encode(&str_len, dst)?;

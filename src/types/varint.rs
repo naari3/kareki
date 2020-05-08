@@ -1,13 +1,24 @@
+use crate::protocol::Protocol;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io;
 use std::io::{Read, Write};
 use std::marker::PhantomData;
-use crate::protocol::Protocol;
 
 pub struct Var<T>(PhantomData<T>);
 
 impl Protocol for Var<i32> {
     type Clean = i32;
+
+    /// Size in bytes of `value` as a `Var<i32>`
+    fn proto_len(value: &i32) -> usize {
+        let value = *value as u32;
+        for i in 1..5 {
+            if (value & (0xffffffffu32 << (7 * i))) == 0 {
+                return i;
+            }
+        }
+        5
+    }
 
     fn proto_encode(value: &i32, dst: &mut dyn Write) -> io::Result<()> {
         let mut temp = *value as u32;
@@ -21,10 +32,10 @@ impl Protocol for Var<i32> {
             }
         }
     }
-    
+
     fn proto_decode(src: &mut dyn Read) -> io::Result<i32> {
         let mut x = 0i32;
-    
+
         for shift in (0u32..32).step_by(7).into_iter() {
             let b = src.read_u8()? as i32;
             x |= (b & 0x7F) << shift;
@@ -32,7 +43,7 @@ impl Protocol for Var<i32> {
                 return Ok(x);
             }
         }
-    
+
         Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "VarInt too big",
