@@ -10,7 +10,7 @@ use super::mcstream::McStream;
 use super::types::string::encode_string;
 use super::types::varint::encode_varint;
 
-use super::packet::{StatusPacket, read_status_packet};
+use super::packet::{read_status_packet, serverbound::StatusPacket};
 
 #[derive(Debug, Serialize)]
 pub struct Description {

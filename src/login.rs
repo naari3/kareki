@@ -5,7 +5,7 @@ use super::mcstream::McStream;
 use super::types::string::encode_string;
 use super::types::varint::encode_varint;
 
-use super::packet::{read_login_packet, LoginPacket};
+use super::packet::{read_login_packet, serverbound::LoginPacket};
 
 use uuid::Uuid;
 

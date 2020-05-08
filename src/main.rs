@@ -11,10 +11,10 @@ mod slp;
 
 use slp::{slp_ping, slp_status};
 
-use packet::{read_handshake_packet, HandshakePacket, NextState};
+use packet::read_handshake_packet;
+use packet::serverbound::{HandshakePacket, NextState};
 
 use aes::Aes128;
-use cfb8::stream_cipher::NewStreamCipher;
 use cfb8::Cfb8;
 
 pub type AesCfb8 = Cfb8<Aes128>;
