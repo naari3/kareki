@@ -1,11 +1,11 @@
-use std::io::{self, Error};
+use std::io::Error;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 mod mcstream;
 mod packet;
-mod types;
 mod protocol;
+mod types;
 
 mod login;
 mod slp;
@@ -26,12 +26,6 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
     let mut stream = McStream::new(stream);
     let next_state = match read_handshake_packet(&mut stream)? {
         HandshakePacket::Handshake { next_state, .. } => next_state,
-        _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet",
-            ))
-        }
     };
     match next_state {
         NextState::Status => {
