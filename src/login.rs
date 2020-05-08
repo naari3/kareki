@@ -116,9 +116,29 @@ pub fn encryption_response(
     };
 }
 
+pub fn set_compression(stream: &mut McStream) -> Result<(), Error> {
+    let mut r = io::Cursor::new(vec![] as Vec<u8>);
+    encode_varint(&3, &mut r)?; // packet_id: 3
+    encode_varint(&-1, &mut r)?; // this mean do not compression
+
+    encode_varint(&(r.get_ref().len() as i32), stream)?;
+    stream.write_all(r.get_ref())?;
+    stream.flush()?;
+
+    println!("login successful");
+    Ok(())
+}
+
 pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> Result<(), Error> {
-    stream.write_all(uuid.as_bytes())?;
-    encode_string(username, stream)?;
+    let mut r = io::Cursor::new(vec![] as Vec<u8>);
+    encode_varint(&2, &mut r)?; // packet_id: 2
+
+    encode_string(&uuid.to_string(), &mut r)?;
+
+    encode_string(username, &mut r)?;
+
+    encode_varint(&(r.get_ref().len() as i32), stream)?;
+    stream.write_all(r.get_ref())?;
     stream.flush()?;
 
     println!("login successful");

@@ -17,7 +17,7 @@ use aes::Aes128;
 use cfb8::stream_cipher::NewStreamCipher;
 use cfb8::Cfb8;
 
-type AesCfb8 = Cfb8<Aes128>;
+pub type AesCfb8 = Cfb8<Aes128>;
 
 use mcstream::McStream;
 
@@ -51,10 +51,12 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
                 "name: {}, id: {}, props: {:?}, key: {:?}",
                 name, id, props, key
             );
+            stream.set_decryptor(&key);
+            stream.set_encryptor(&key);
 
-            let encryptor = AesCfb8::new_var(&key, &key).unwrap();
-            let decryptor = AesCfb8::new_var(&key, &key).unwrap();
-            // login::login_success(&mut stream, &Uuid::new_v4(), &name)?;
+            login::set_compression(&mut stream)?;
+
+            login::login_success(&mut stream, &id, &name)?;
         }
     };
 
