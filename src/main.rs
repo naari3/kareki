@@ -54,7 +54,10 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             login::login_success(&mut stream, &id, &name)?;
 
             play::join_game(&mut stream)?;
-            play::client_settings(&mut stream);
+            play::client_settings(&mut stream)?;
+            play::held_item_change(&mut stream)?;
+            play::declare_recipes(&mut stream)?;
+            play::tags(&mut stream)?;
         }
     };
 

@@ -53,3 +53,52 @@ pub fn client_settings(stream: &mut McStream) -> Result<(), Error> {
 
     Ok(())
 }
+
+pub fn held_item_change(stream: &mut McStream) -> Result<(), Error> {
+    let mut r = io::Cursor::new(vec![] as Vec<u8>);
+    let r_ref = &mut r;
+
+    <Var<i32>>::proto_encode(&0x40, r_ref)?; // packet id: 0x40
+    
+    u8::proto_encode(&0, r_ref)?; // slot
+
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
+    stream.write_all(r.get_ref())?;
+    stream.flush()?;
+
+    Ok(())
+
+}
+
+pub fn declare_recipes(stream: &mut McStream) -> Result<(), Error> {
+    let mut r = io::Cursor::new(vec![] as Vec<u8>);
+    let r_ref = &mut r;
+
+    <Var<i32>>::proto_encode(&0x5B, r_ref)?; // packet id: 0x5B
+    
+    <Var<i32>>::proto_encode(&0, r_ref)?; // num recipes (zero)
+
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
+    stream.write_all(r.get_ref())?;
+    stream.flush()?;
+
+    Ok(())
+}
+
+pub fn tags(stream: &mut McStream) -> Result<(), Error> {
+    let mut r = io::Cursor::new(vec![] as Vec<u8>);
+    let r_ref = &mut r;
+
+    <Var<i32>>::proto_encode(&0x5C, r_ref)?; // packet id: 0x5C
+    
+    <Var<i32>>::proto_encode(&0, r_ref)?; // num block tags (zero)
+    <Var<i32>>::proto_encode(&0, r_ref)?; // num item tags (zero)
+    <Var<i32>>::proto_encode(&0, r_ref)?; // num fluid tags (zero)
+    <Var<i32>>::proto_encode(&0, r_ref)?; // num entity tags (zero)
+
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
+    stream.write_all(r.get_ref())?;
+    stream.flush()?;
+
+    Ok(())
+}

@@ -1,7 +1,7 @@
 use std::io::{self, Error, Read};
 
-use crate::types::{Var, Arr};
 use crate::protocol::Protocol;
+use crate::types::{Arr, Var};
 
 pub mod clientbound {
     pub enum StatusPacket {
@@ -62,7 +62,7 @@ pub mod serverbound {
             chat_colors: bool,
             displayed_skin_parts: u8,
             main_hand: i32,
-        }
+        },
     }
 
     pub enum NextState {
