@@ -2,10 +2,11 @@ use std::io::{self, Error, Write};
 
 use super::mcstream::McStream;
 
-use super::types::string::encode_string;
-use super::types::varint::encode_varint;
+use super::types::varint::Var;
 
 use super::packet::{read_login_packet, serverbound::LoginPacket};
+
+use crate::protocol::Protocol;
 
 use uuid::Uuid;
 
@@ -15,10 +16,10 @@ use openssl::rsa::{Padding, Rsa};
 pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
-    encode_varint(&0, &mut r)?; // packet_id: 0
-    encode_string(&r#"{"text": "konaide ( ; _ ; )"}"#.to_string(), &mut r)?;
+    <Var<i32>>::proto_encode(&0, &mut r)?; // packet_id: 0
+    String::proto_encode(&r#"{"text": "konaide ( ; _ ; )"}"#.to_string(), &mut r)?;
 
-    encode_varint(&(r.get_ref().len() as i32), stream)?;
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
     stream.write_all(r.get_ref())?;
 
     println!("disconnected");
@@ -47,15 +48,15 @@ pub fn encryption_request(
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
     let mut dst = io::Cursor::new(vec![] as Vec<u8>);
 
-    encode_varint(&1, &mut r)?; // packet_id: 1
+    <Var<i32>>::proto_encode(&1, &mut r)?; // packet_id: 1
 
-    encode_string(&"".to_string(), &mut r)?;
-    encode_varint(&(pubkey.len() as i32), &mut r)?;
+    String::proto_encode(&"".to_string(), &mut r)?;
+    <Var<i32>>::proto_encode(&(pubkey.len() as i32), &mut r)?;
     r.write(&pubkey)?;
-    encode_varint(&(verify_token.len() as i32), &mut r)?;
+    <Var<i32>>::proto_encode(&(verify_token.len() as i32), &mut r)?;
     r.write(&verify_token)?;
 
-    encode_varint(&(r.get_ref().len() as i32), &mut dst)?;
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), &mut dst)?;
     dst.write_all(r.get_ref())?;
 
     stream.write_all(dst.get_ref())?;
@@ -118,26 +119,25 @@ pub fn encryption_response(
 
 pub fn set_compression(stream: &mut McStream) -> Result<(), Error> {
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    encode_varint(&3, &mut r)?; // packet_id: 3
-    encode_varint(&-1, &mut r)?; // this mean do not compression
+    <Var<i32>>::proto_encode(&3, &mut r)?; // packet_id: 3
+    <Var<i32>>::proto_encode(&-1, &mut r)?; // this mean do not compression
 
-    encode_varint(&(r.get_ref().len() as i32), stream)?;
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
     stream.write_all(r.get_ref())?;
     stream.flush()?;
 
-    println!("login successful");
     Ok(())
 }
 
 pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> Result<(), Error> {
     let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    encode_varint(&2, &mut r)?; // packet_id: 2
+    <Var<i32>>::proto_encode(&2, &mut r)?; // packet_id: 2
 
-    encode_string(&uuid.to_string(), &mut r)?;
+    String::proto_encode(&uuid.to_string(), &mut r)?;
 
-    encode_string(username, &mut r)?;
+    String::proto_encode(username, &mut r)?;
 
-    encode_varint(&(r.get_ref().len() as i32), stream)?;
+    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
     stream.write_all(r.get_ref())?;
     stream.flush()?;
 

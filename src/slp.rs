@@ -5,10 +5,10 @@ use serde::{Serialize, Serializer};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
-use super::mcstream::McStream;
+use crate::types::varint::Var;
+use crate::protocol::Protocol;
 
-use super::types::string::encode_string;
-use super::types::varint::encode_varint;
+use super::mcstream::McStream;
 
 use super::packet::{read_status_packet, serverbound::StatusPacket};
 
@@ -86,12 +86,12 @@ pub fn slp_status(stream: &mut McStream) -> Result<(), Error> {
 
             println!("will send: {}", json_response);
 
-            encode_varint(&0, &mut r)?; // packet_id: 0
-            encode_string(&json_response.to_string(), &mut r)?;
+            <Var<i32>>::proto_encode(&0, &mut r)?; // packet_id: 0
+            String::proto_encode(&json_response.to_string(), &mut r)?;
 
             println!("packet size: {}", r.get_ref().len() as i32);
 
-            encode_varint(&(r.get_ref().len() as i32), stream)?;
+            <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
             stream.write_all(r.get_ref())?;
 
             stream.flush()?;
@@ -114,10 +114,10 @@ pub fn slp_ping(stream: &mut McStream) -> Result<(), Error> {
 
             let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
-            encode_varint(&1, &mut r)?;
+            <Var<i32>>::proto_encode(&1, &mut r)?;
             r.write_u64::<BigEndian>(payload)?;
 
-            encode_varint(&(r.get_ref().len() as i32), stream)?;
+            <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
             stream.write_all(&r.get_ref())?;
 
             println!("sent pong");

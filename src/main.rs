@@ -5,6 +5,7 @@ use std::thread;
 mod mcstream;
 mod packet;
 mod types;
+mod protocol;
 
 mod login;
 mod slp;

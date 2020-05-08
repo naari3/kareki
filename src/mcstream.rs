@@ -1,8 +1,7 @@
 // referenced https://docs.rs/crate/bufstream/0.1.4
 // because idk how to overwrite part of implementation
-use std::error;
+use std::io;
 use std::io::prelude::*;
-use std::io::{self, BufReader, BufWriter};
 
 use std::net::TcpStream;
 
@@ -11,8 +10,6 @@ use cfb8::stream_cipher::{NewStreamCipher, StreamCipher};
 use cfb8::Cfb8;
 
 pub type AesCfb8 = Cfb8<Aes128>;
-
-const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 
 pub struct McStream {
     buffer: Vec<u8>,
@@ -24,8 +21,8 @@ pub struct McStream {
 impl McStream {
     /// Creates a new buffered stream with explicitly listed capacities for the
     /// reader/writer buffer.
-    pub fn with_capacities(writer_cap: usize, inner: TcpStream) -> McStream {
-        let mut buffer = vec![];
+    pub fn with_capacities(inner: TcpStream) -> McStream {
+        let buffer = vec![];
         // unsafe { buffer.set_len(writer_cap) };
         McStream {
             inner: inner,
@@ -38,7 +35,7 @@ impl McStream {
     /// Creates a new buffered stream with the default reader/writer buffer
     /// capacities.
     pub fn new(inner: TcpStream) -> McStream {
-        McStream::with_capacities(DEFAULT_BUF_SIZE, inner)
+        McStream::with_capacities(inner)
     }
 
     pub fn set_encryptor(&mut self, key: &[u8]) {
