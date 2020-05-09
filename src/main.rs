@@ -8,8 +8,8 @@ mod protocol;
 mod types;
 
 mod login;
-mod slp;
 mod play;
+mod slp;
 
 use slp::{slp_ping, slp_status};
 
@@ -58,6 +58,17 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             play::held_item_change(&mut stream)?;
             play::declare_recipes(&mut stream)?;
             play::tags(&mut stream)?;
+            play::entity_status(&mut stream)?;
+            // play::decrale_commands(&mut stream)?;
+            play::unlock_recipes(&mut stream)?;
+            play::play_position_and_look(&mut stream)?;
+            play::player_info(&mut stream)?;
+            play::update_view_position(&mut stream)?;
+            play::update_light(&mut stream)?;
+            // play::chunk_data(&mut stream)?;
+            play::world_border(&mut stream)?;
+            play::spawn_position(&mut stream)?;
+            play::play_position_and_look(&mut stream)?;
         }
     };
 
