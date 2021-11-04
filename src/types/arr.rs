@@ -7,11 +7,11 @@ use num::{NumCast, ToPrimitive};
 
 use crate::protocol::Protocol;
 
-pub struct Arr<L, T>(PhantomData<(fn() -> L, T)>);
+pub struct Arr<L, T>(Vec<T>, PhantomData<(fn() -> L, T)>);
 
 impl<L: Protocol, T: Protocol> Protocol for Arr<L, T>
 where
-    L::Clean: NumCast,
+    L::Clean: NumCast + Protocol,
 {
     type Clean = Vec<T::Clean>;
 
@@ -26,14 +26,14 @@ where
         len_len + len_values
     }
 
-    fn proto_encode(value: &Vec<T::Clean>, dst: &mut dyn Write) -> io::Result<()> {
-        let len = <L::Clean as NumCast>::from(value.len()).ok_or(io::Error::new(
+    fn proto_encode(&self, dst: &mut dyn Write) -> io::Result<()> {
+        let len = <L::Clean as NumCast>::from(self.0.len()).ok_or(io::Error::new(
             io::ErrorKind::InvalidInput,
             "could not convert length of vector to Array length type",
         ))?;
-        <L as Protocol>::proto_encode(&len, dst)?;
-        for elt in value {
-            <T as Protocol>::proto_encode(elt, dst)?;
+        len.proto_encode(dst)?;
+        for elt in self.0 {
+            elt.proto_encode(dst)?;
         }
         Ok(())
     }

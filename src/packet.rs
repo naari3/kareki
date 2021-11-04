@@ -1,4 +1,4 @@
-use std::io::{self, Error, Read};
+use std::io::{self, Error, Read, Write};
 
 use crate::protocol::Protocol;
 use crate::types::{Arr, Var};

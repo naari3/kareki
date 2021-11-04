@@ -2,9 +2,14 @@ use crate::protocol::Protocol;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io;
 use std::io::{Read, Write};
-use std::marker::PhantomData;
 
-pub struct Var<T>(PhantomData<T>);
+pub struct Var<T>(pub T);
+
+impl<T> From<T> for Var<T> {
+    fn from(n: T) -> Self {
+        Var(n)
+    }
+}
 
 impl Protocol for Var<i32> {
     type Clean = i32;
@@ -20,8 +25,8 @@ impl Protocol for Var<i32> {
         5
     }
 
-    fn proto_encode(value: &i32, dst: &mut dyn Write) -> io::Result<()> {
-        let mut temp = *value as u32;
+    fn proto_encode(&self, dst: &mut dyn Write) -> io::Result<()> {
+        let mut temp = self.0 as u32;
         loop {
             if (temp & !0x7fu32) == 0 {
                 dst.write_u8(temp as u8)?;
