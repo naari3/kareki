@@ -1,6 +1,6 @@
 use std::io::{self, Error, Read};
 
-use crate::protocol::Protocol;
+use crate::protocol::ProtocolRead;
 use crate::types::{Arr, Var};
 
 pub mod clientbound {

@@ -2,7 +2,7 @@ use std::io::{self, Error, Write};
 
 use super::mcstream::McStream;
 use crate::packet::{read_play_packet, serverbound::PlayPacket};
-use crate::protocol::Protocol;
+use crate::protocol::ProtocolWrite;
 use crate::types::{Arr, Var};
 
 pub fn join_game(stream: &mut McStream) -> Result<(), Error> {

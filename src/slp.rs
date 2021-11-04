@@ -5,8 +5,8 @@ use serde::{Serialize, Serializer};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
+use crate::protocol::ProtocolWrite;
 use crate::types::Var;
-use crate::protocol::Protocol;
 
 use super::mcstream::McStream;
 

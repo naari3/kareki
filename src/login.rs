@@ -2,11 +2,11 @@ use std::io::{self, Error, Write};
 
 use super::mcstream::McStream;
 
-use crate::types::{Var, Arr};
+use crate::types::{Arr, Var};
 
 use super::packet::{read_login_packet, serverbound::LoginPacket};
 
-use crate::protocol::Protocol;
+use crate::protocol::ProtocolWrite;
 
 use uuid::Uuid;
 
@@ -141,4 +141,9 @@ pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> R
 
     println!("login successful");
     Ok(())
+}
+
+struct LoginSuccess {
+    uuid: Uuid,
+    username: String,
 }

@@ -1,4 +1,4 @@
-use crate::protocol::Protocol;
+use crate::protocol::{ProtocolClean, ProtocolLen, ProtocolRead, ProtocolWrite};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io;
 use std::io::{Read, Write};
@@ -6,9 +6,11 @@ use std::marker::PhantomData;
 
 pub struct Var<T>(PhantomData<T>);
 
-impl Protocol for Var<i32> {
+impl ProtocolClean for Var<i32> {
     type Clean = i32;
+}
 
+impl ProtocolLen for Var<i32> {
     /// Size in bytes of `value` as a `Var<i32>`
     fn proto_len(value: &i32) -> usize {
         let value = *value as u32;
@@ -19,7 +21,9 @@ impl Protocol for Var<i32> {
         }
         5
     }
+}
 
+impl ProtocolWrite for Var<i32> {
     fn proto_encode(value: &i32, dst: &mut dyn Write) -> io::Result<()> {
         let mut temp = *value as u32;
         loop {
@@ -32,7 +36,9 @@ impl Protocol for Var<i32> {
             }
         }
     }
+}
 
+impl ProtocolRead for Var<i32> {
     fn proto_decode(src: &mut dyn Read) -> io::Result<i32> {
         let mut x = 0i32;
 

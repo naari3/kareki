@@ -2,23 +2,29 @@ use std::io;
 use std::io::{Read, Write};
 
 use super::varint::Var;
-use crate::protocol::Protocol;
+use crate::protocol::{ProtocolClean, ProtocolLen, ProtocolRead, ProtocolWrite};
 
-impl Protocol for String {
+impl ProtocolClean for String {
     type Clean = String;
+}
 
+impl ProtocolLen for String {
     fn proto_len(value: &String) -> usize {
         let str_len = value.len();
-        <Var<i32> as Protocol>::proto_len(&(str_len as i32)) + str_len
+        <Var<i32>>::proto_len(&(str_len as i32)) + str_len
     }
+}
 
+impl ProtocolWrite for String {
     fn proto_encode(value: &String, dst: &mut dyn Write) -> io::Result<()> {
         let str_len = value.len() as i32;
         <Var<i32>>::proto_encode(&str_len, dst)?;
         dst.write_all(value.as_bytes())?;
         Ok(())
     }
+}
 
+impl ProtocolRead for String {
     fn proto_decode(src: &mut dyn Read) -> io::Result<String> {
         let len: i32 = <Var<i32>>::proto_decode(src)?;
         let mut s = vec![0u8; len as usize];
