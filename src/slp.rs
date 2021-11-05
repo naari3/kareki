@@ -10,7 +10,7 @@ use crate::types::Var;
 
 use super::mcstream::McStream;
 
-use super::packet::{read_status_packet, serverbound::StatusPacket};
+use super::packet::{read_status_packet, server::StatusPacket};
 
 #[derive(Debug, Serialize)]
 pub struct Description {

@@ -2,34 +2,20 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io;
 use std::io::{Read, Write};
 
-pub trait Protocol: ProtocolClean + ProtocolLen + ProtocolRead + ProtocolWrite {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Self::Clean>;
-    fn proto_encode(value: &Self::Clean, dst: &mut dyn Write) -> io::Result<()>;
-    fn proto_len(value: &Self::Clean) -> usize;
+pub trait ProtocolRead<Clean = Self> {
+    fn proto_decode(src: &mut dyn Read) -> io::Result<Clean>;
 }
 
-pub trait ProtocolClean {
-    type Clean;
+pub trait ProtocolWrite<Clean = Self> {
+    fn proto_encode(value: &Clean, dst: &mut dyn Write) -> io::Result<()>;
 }
 
-pub trait ProtocolRead: ProtocolClean {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Self::Clean>;
-}
-
-pub trait ProtocolWrite: ProtocolClean {
-    fn proto_encode(value: &Self::Clean, dst: &mut dyn Write) -> io::Result<()>;
-}
-
-pub trait ProtocolLen: ProtocolClean {
-    fn proto_len(value: &Self::Clean) -> usize;
+pub trait ProtocolLen<Clean = Self> {
+    fn proto_len(value: &Clean) -> usize;
 }
 
 macro_rules! impl_protocol {
     ($name:ty, 1, $enc_name:ident, $dec_name:ident) => {
-        impl ProtocolClean for $name {
-            type Clean = Self;
-        }
-
         impl ProtocolLen for $name {
             fn proto_len(_: &$name) -> usize {
                 1
@@ -48,10 +34,6 @@ macro_rules! impl_protocol {
         }
     };
     ($name:ty, $len:expr, $enc_name:ident, $dec_name:ident) => {
-        impl ProtocolClean for $name {
-            type Clean = Self;
-        }
-
         impl ProtocolLen for $name {
             fn proto_len(_: &$name) -> usize {
                 $len
@@ -84,10 +66,6 @@ impl_protocol!(i64, 8, write_i64, read_i64);
 impl_protocol!(u64, 8, write_u64, read_u64);
 impl_protocol!(f32, 4, write_f32, read_f32);
 impl_protocol!(f64, 8, write_f64, read_f64);
-
-impl ProtocolClean for bool {
-    type Clean = bool;
-}
 
 impl ProtocolLen for bool {
     fn proto_len(_: &bool) -> usize {

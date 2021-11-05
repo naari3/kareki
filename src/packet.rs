@@ -1,77 +1,21 @@
-use std::io::{self, Error, Read};
+use crate::protocol::{ProtocolRead, ProtocolWrite};
+use std::io::{self, Error, Read, Write};
 
-use crate::protocol::ProtocolRead;
 use crate::types::{Arr, Var};
 
-pub mod clientbound {
-    pub enum StatusPacket {
-        Response {
-            json_length: i32,
-            json_response: String,
-        },
-        Pong {
-            payload: u64,
-        },
-    }
-    pub enum Login {
-        Disconnect {
-            chat: String,
-        },
-        EncryptionRequest {
-            server_id: String,
-            public_key: Vec<u8>,
-            verify_token: Vec<u8>,
-        },
-        LoginSuccess {
-            uuid: String,
-            username: String,
-        },
+pub mod client;
+pub mod server;
+
+// use client::*;
+use server::*;
+
+pub trait PacketRead {}
+
+pub trait PacketWrite: ProtocolWrite + Sized {
+    fn packet_write(&self, dst: &mut dyn Write) -> io::Result<()> {
+        Self::proto_encode(self, dst)
     }
 }
-
-pub mod serverbound {
-    pub enum HandshakePacket {
-        Handshake {
-            protocol_version: i32,
-            server_address: String,
-            server_port: u16,
-            next_state: NextState,
-        },
-    }
-
-    pub enum StatusPacket {
-        Request,
-        Ping { payload: u64 },
-    }
-
-    pub enum LoginPacket {
-        LoginStart {
-            name: String,
-        },
-        EncryptionResponse {
-            shared_secret: Vec<u8>,
-            verify_token: Vec<u8>,
-        },
-    }
-
-    pub enum PlayPacket {
-        ClientSettings {
-            locale: String,
-            view_distance: u8,
-            chat_mode: i32,
-            chat_colors: bool,
-            displayed_skin_parts: u8,
-            main_hand: i32,
-        },
-    }
-
-    pub enum NextState {
-        Status,
-        Login,
-    }
-}
-
-use serverbound::*;
 
 fn read_packet_meta(stream: &mut dyn Read) -> Result<(u32, u32), Error> {
     let packet_size = <Var<i32>>::proto_decode(stream)? as u32;

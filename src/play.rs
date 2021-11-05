@@ -1,7 +1,7 @@
 use std::io::{self, Error, Write};
 
 use super::mcstream::McStream;
-use crate::packet::{read_play_packet, serverbound::PlayPacket};
+use crate::packet::{read_play_packet, server::PlayPacket};
 use crate::protocol::ProtocolWrite;
 use crate::types::{Arr, Var};
 

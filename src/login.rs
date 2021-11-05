@@ -4,7 +4,7 @@ use super::mcstream::McStream;
 
 use crate::types::{Arr, Var};
 
-use super::packet::{read_login_packet, serverbound::LoginPacket};
+use super::packet::{read_login_packet, server::LoginPacket};
 
 use crate::protocol::ProtocolWrite;
 
@@ -141,9 +141,4 @@ pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> R
 
     println!("login successful");
     Ok(())
-}
-
-struct LoginSuccess {
-    uuid: Uuid,
-    username: String,
 }

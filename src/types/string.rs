@@ -2,11 +2,7 @@ use std::io;
 use std::io::{Read, Write};
 
 use super::varint::Var;
-use crate::protocol::{ProtocolClean, ProtocolLen, ProtocolRead, ProtocolWrite};
-
-impl ProtocolClean for String {
-    type Clean = String;
-}
+use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 
 impl ProtocolLen for String {
     fn proto_len(value: &String) -> usize {
