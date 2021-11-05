@@ -44,30 +44,8 @@ pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> 
 }
 
 pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
-    let (_, packet_id) = read_packet_meta(stream)?;
-
-    match packet_id {
-        0 => {
-            return Ok(LoginPacket::LoginStart {
-                name: String::proto_decode(stream)?,
-            })
-        }
-        1 => {
-            let shared_secret = <Arr<Var<i32>, u8>>::proto_decode(stream)?;
-            let verify_token = <Arr<Var<i32>, u8>>::proto_decode(stream)?;
-
-            return Ok(LoginPacket::EncryptionResponse {
-                shared_secret,
-                verify_token,
-            });
-        }
-        _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet id",
-            ))
-        }
-    }
+    println!("get status");
+    Ok(LoginPacket::proto_decode(stream)?)
 }
 
 pub fn read_play_packet(stream: &mut dyn Read) -> Result<PlayPacket, Error> {

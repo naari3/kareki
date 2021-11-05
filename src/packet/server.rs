@@ -1,6 +1,9 @@
 use std::io::{self, Read};
 
-use crate::{protocol::ProtocolRead, types::Var};
+use crate::{
+    protocol::ProtocolRead,
+    types::{Arr, Var},
+};
 
 fn read_packet_meta(stream: &mut dyn Read) -> std::io::Result<(u32, u32)> {
     let packet_size = <Var<i32>>::proto_decode(stream)? as u32;
@@ -91,13 +94,24 @@ impl ProtocolRead for Ping {
 }
 
 pub enum LoginPacket {
-    LoginStart {
-        name: String,
-    },
-    EncryptionResponse {
-        shared_secret: Vec<u8>,
-        verify_token: Vec<u8>,
-    },
+    LoginStart(LoginStart),
+    EncryptionResponse(EncryptionResponse),
+}
+
+impl ProtocolRead for LoginPacket {
+    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+        let (_packet_size, packet_id) = read_packet_meta(src)?;
+        Ok(match packet_id {
+            0 => LoginPacket::LoginStart(LoginStart::proto_decode(src)?),
+            1 => LoginPacket::EncryptionResponse(EncryptionResponse::proto_decode(src)?),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid LoginPacket",
+                ))
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +123,21 @@ impl ProtocolRead for LoginStart {
     fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
         Ok(Self {
             name: String::proto_decode(src)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EncryptionResponse {
+    pub shared_secret: Vec<u8>,
+    pub verify_token: Vec<u8>,
+}
+
+impl ProtocolRead for EncryptionResponse {
+    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+        Ok(Self {
+            shared_secret: <Arr<Var<i32>, u8>>::proto_decode(src)?,
+            verify_token: <Arr<Var<i32>, u8>>::proto_decode(src)?,
         })
     }
 }

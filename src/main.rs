@@ -23,7 +23,7 @@ pub type AesCfb8 = Cfb8<Aes128>;
 
 use mcstream::McStream;
 
-use crate::packet::read_status_packet;
+use crate::packet::{read_login_packet, read_status_packet};
 
 fn handler(stream: TcpStream) -> Result<(), Error> {
     let mut stream = McStream::new(stream);
@@ -38,24 +38,39 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             }
         },
         NextState::Login => {
-            let name = login::login_start(&mut stream)?;
-            println!("login attempt: {}", name);
-
             let rsa = openssl::rsa::Rsa::generate(1024).unwrap();
-            let pubkey = rsa.public_key_to_der()?;
-            let verify_token = vec![0u8, 123, 212, 123];
 
-            login::encryption_request(&mut stream, pubkey, verify_token)?;
-            let (name, id, props, key) = login::encryption_response(&mut stream, &rsa, &name)?;
-            println!(
-                "name: {}, id: {}, props: {:?}, key: {:?}",
-                name, id, props, key
-            );
-            stream.set_decryptor(&key);
-            stream.set_encryptor(&key);
+            let mut name = "".to_string();
 
-            login::set_compression(&mut stream)?;
-            login::login_success(&mut stream, id.to_string(), name)?;
+            loop {
+                match read_login_packet(&mut stream)? {
+                    packet::server::LoginPacket::LoginStart(login_start) => {
+                        let public_key = rsa.public_key_to_der()?;
+                        let verify_token = vec![0u8, 123, 212, 123];
+                        name = login::login_start(&mut stream, login_start)?;
+                        println!("login attempt: {}", name);
+                        login::encryption_request(&mut stream, public_key, verify_token)?;
+                    }
+                    packet::server::LoginPacket::EncryptionResponse(encryption_response) => {
+                        let (name, id, props, key) = login::encryption_response(
+                            &mut stream,
+                            encryption_response,
+                            &rsa,
+                            &name,
+                        )?;
+                        println!(
+                            "name: {}, id: {}, props: {:?}, key: {:?}",
+                            name, id, props, key
+                        );
+                        stream.set_decryptor(&key);
+                        stream.set_encryptor(&key);
+
+                        login::set_compression(&mut stream)?;
+                        login::login_success(&mut stream, id.to_string(), name)?;
+                        break; // TODO: to play mode
+                    }
+                };
+            }
 
             play::join_game(&mut stream)?;
             play::client_settings(&mut stream)?;

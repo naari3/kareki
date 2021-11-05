@@ -3,6 +3,7 @@ use std::io::{self, Error};
 use super::mcstream::McStream;
 
 use crate::packet::client::{Disconnect, EncryptionRequest, LoginSuccess, SetCompression};
+use crate::packet::server::{EncryptionResponse, LoginStart};
 use crate::packet::PacketWrite;
 
 use super::packet::{read_login_packet, server::LoginPacket};
@@ -22,18 +23,8 @@ pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn login_start(stream: &mut McStream) -> Result<String, Error> {
-    match read_login_packet(stream)? {
-        LoginPacket::LoginStart { name } => {
-            return Ok(name);
-        }
-        _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet id",
-            ))
-        }
-    }
+pub fn login_start(stream: &mut McStream, login_start: LoginStart) -> Result<String, Error> {
+    return Ok(login_start.name);
 }
 
 pub fn encryption_request(
@@ -54,50 +45,45 @@ pub fn encryption_request(
 
 pub fn encryption_response(
     stream: &mut McStream,
+    enctyption_response: EncryptionResponse,
     rsa: &Rsa<Private>,
     name: &String,
 ) -> Result<(String, Uuid, Vec<mojang_api::ProfileProperty>, [u8; 16]), Error> {
     println!("receive encryption response");
-    match read_login_packet(stream)? {
-        LoginPacket::EncryptionResponse {
-            shared_secret,
-            verify_token,
-            ..
-        } => {
-            // use mojang_api::ServerAuthResponse;
+    // use mojang_api::ServerAuthResponse;
 
-            let mut decoded_shared_secret = vec![0; rsa.size() as usize];
-            rsa.private_decrypt(&shared_secret, &mut decoded_shared_secret, Padding::PKCS1)?;
-            let mut decoded_verify_token = vec![0; rsa.size() as usize];
-            rsa.private_decrypt(&verify_token, &mut decoded_verify_token, Padding::PKCS1)?;
-            println!("shared_secret: {:?}", decoded_shared_secret);
-            println!("verify_token:  {:?}", decoded_verify_token);
+    let mut decoded_shared_secret = vec![0; rsa.size() as usize];
+    rsa.private_decrypt(
+        &enctyption_response.shared_secret,
+        &mut decoded_shared_secret,
+        Padding::PKCS1,
+    )?;
+    let mut decoded_verify_token = vec![0; rsa.size() as usize];
+    rsa.private_decrypt(
+        &enctyption_response.verify_token,
+        &mut decoded_verify_token,
+        Padding::PKCS1,
+    )?;
+    println!("shared_secret: {:?}", decoded_shared_secret);
+    println!("verify_token:  {:?}", decoded_verify_token);
 
-            let mut key = [0u8; 16];
-            for (i, x) in decoded_shared_secret[..16].iter().enumerate() {
-                key[i] = *x;
-            }
+    let mut key = [0u8; 16];
+    for (i, x) in decoded_shared_secret[..16].iter().enumerate() {
+        key[i] = *x;
+    }
 
-            let server_hash = mojang_api::server_hash("", key, &rsa.public_key_to_der()?);
-            let auth_result = mojang_api::server_auth(&server_hash, name);
+    let server_hash = mojang_api::server_hash("", key, &rsa.public_key_to_der()?);
+    let auth_result = mojang_api::server_auth(&server_hash, name);
 
-            let mut rt = tokio::runtime::Runtime::new()?;
-            match rt.block_on(auth_result) {
-                Ok(auth) => {
-                    return Ok((auth.name, auth.id, auth.properties, key));
-                }
-                Err(e) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("auth failed {:?}", e),
-                    ))
-                }
-            };
+    let mut rt = tokio::runtime::Runtime::new()?;
+    match rt.block_on(auth_result) {
+        Ok(auth) => {
+            return Ok((auth.name, auth.id, auth.properties, key));
         }
-        _ => {
+        Err(e) => {
             return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet id",
+                io::ErrorKind::InvalidData,
+                format!("auth failed {:?}", e),
             ))
         }
     };
