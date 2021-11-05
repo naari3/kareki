@@ -5,13 +5,84 @@ use super::mcstream::McStream;
 use crate::packet::client::{Disconnect, EncryptionRequest, LoginSuccess, SetCompression};
 use crate::packet::server::{EncryptionResponse, LoginStart};
 use crate::packet::PacketWrite;
+use crate::state::{Mode, State};
 
-use super::packet::{read_login_packet, server::LoginPacket};
+use openssl::rsa::Padding;
 
-use uuid::Uuid;
+pub fn login_start(
+    stream: &mut McStream,
+    state: &mut State,
+    login_start: LoginStart,
+) -> Result<(), Error> {
+    let public_key = state
+        .rsa
+        .as_ref()
+        .expect("maybe not in login mode")
+        .public_key_to_der()?;
+    let verify_token = vec![0u8, 123, 212, 123];
+    println!("login attempt: {}", login_start.name);
+    state.name = Some(login_start.name);
+    encryption_request(stream, public_key, verify_token)?;
 
-use openssl::pkey::Private;
-use openssl::rsa::{Padding, Rsa};
+    return Ok(());
+}
+
+pub fn encryption_response(
+    stream: &mut McStream,
+    state: &mut State,
+    enctyption_response: EncryptionResponse,
+) -> Result<(), Error> {
+    println!("receive encryption response");
+    // use mojang_api::ServerAuthResponse;
+
+    let mut decoded_shared_secret = vec![0; state.rsa.as_ref().unwrap().size() as usize];
+    state.rsa.as_ref().unwrap().private_decrypt(
+        &enctyption_response.shared_secret,
+        &mut decoded_shared_secret,
+        Padding::PKCS1,
+    )?;
+    let mut decoded_verify_token = vec![0; state.rsa.as_ref().unwrap().size() as usize];
+    state.rsa.as_ref().unwrap().private_decrypt(
+        &enctyption_response.verify_token,
+        &mut decoded_verify_token,
+        Padding::PKCS1,
+    )?;
+    println!("shared_secret: {:?}", decoded_shared_secret);
+    println!("verify_token:  {:?}", decoded_verify_token);
+
+    let mut key = [0u8; 16];
+    for (i, x) in decoded_shared_secret[..16].iter().enumerate() {
+        key[i] = *x;
+    }
+
+    let server_hash =
+        mojang_api::server_hash("", key, &state.rsa.as_ref().unwrap().public_key_to_der()?);
+    let auth_result = mojang_api::server_auth(&server_hash, &state.name.as_ref().unwrap());
+
+    let mut rt = tokio::runtime::Runtime::new()?;
+    let (name, uuid, props) = match rt.block_on(auth_result) {
+        Ok(auth) => (auth.name, auth.id, auth.properties),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("auth failed {:?}", e),
+            ))
+        }
+    };
+
+    println!(
+        "name: {}, id: {}, props: {:?}, key: {:?}",
+        name, uuid, props, key
+    );
+    stream.set_decryptor(&key);
+    stream.set_encryptor(&key);
+
+    set_compression(stream)?;
+    login_success(stream, uuid.to_string(), name)?;
+    state.mode = Mode::Play;
+
+    Ok(())
+}
 
 pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
     let disconnect = Disconnect {
@@ -21,10 +92,6 @@ pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
 
     println!("disconnected");
     Ok(())
-}
-
-pub fn login_start(stream: &mut McStream, login_start: LoginStart) -> Result<String, Error> {
-    return Ok(login_start.name);
 }
 
 pub fn encryption_request(
@@ -41,52 +108,6 @@ pub fn encryption_request(
 
     println!("sent encrypted request");
     Ok(())
-}
-
-pub fn encryption_response(
-    stream: &mut McStream,
-    enctyption_response: EncryptionResponse,
-    rsa: &Rsa<Private>,
-    name: &String,
-) -> Result<(String, Uuid, Vec<mojang_api::ProfileProperty>, [u8; 16]), Error> {
-    println!("receive encryption response");
-    // use mojang_api::ServerAuthResponse;
-
-    let mut decoded_shared_secret = vec![0; rsa.size() as usize];
-    rsa.private_decrypt(
-        &enctyption_response.shared_secret,
-        &mut decoded_shared_secret,
-        Padding::PKCS1,
-    )?;
-    let mut decoded_verify_token = vec![0; rsa.size() as usize];
-    rsa.private_decrypt(
-        &enctyption_response.verify_token,
-        &mut decoded_verify_token,
-        Padding::PKCS1,
-    )?;
-    println!("shared_secret: {:?}", decoded_shared_secret);
-    println!("verify_token:  {:?}", decoded_verify_token);
-
-    let mut key = [0u8; 16];
-    for (i, x) in decoded_shared_secret[..16].iter().enumerate() {
-        key[i] = *x;
-    }
-
-    let server_hash = mojang_api::server_hash("", key, &rsa.public_key_to_der()?);
-    let auth_result = mojang_api::server_auth(&server_hash, name);
-
-    let mut rt = tokio::runtime::Runtime::new()?;
-    match rt.block_on(auth_result) {
-        Ok(auth) => {
-            return Ok((auth.name, auth.id, auth.properties, key));
-        }
-        Err(e) => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("auth failed {:?}", e),
-            ))
-        }
-    };
 }
 
 pub fn set_compression(stream: &mut McStream) -> Result<(), Error> {
