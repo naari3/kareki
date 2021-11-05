@@ -9,7 +9,8 @@ pub struct State {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Mode {
     Handshake,
-    Slp,
+    Status,
     Login,
     Play,
+    Finish,
 }

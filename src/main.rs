@@ -30,24 +30,33 @@ use crate::state::Mode;
 
 fn handler(stream: TcpStream) -> Result<(), Error> {
     let mut stream = McStream::new(stream);
-    let next_state = match read_handshake_packet(&mut stream)? {
-        HandshakePacket::Handshake(handshake) => handshake.next_state,
+    let mut state = state::State {
+        mode: Mode::Handshake,
+        name: None,
+        rsa: None,
     };
-    match next_state {
-        NextState::Status => loop {
-            match read_status_packet(&mut stream)? {
-                packet::server::StatusPacket::Request(request) => slp_status(&mut stream, request)?,
-                packet::server::StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
+    loop {
+        match &state.mode {
+            Mode::Handshake => {
+                match read_handshake_packet(&mut stream)? {
+                    HandshakePacket::Handshake(handshake) => match handshake.next_state {
+                        NextState::Status => state.mode = Mode::Status,
+                        NextState::Login => {
+                            state.mode = Mode::Login;
+                            state.rsa = Some(openssl::rsa::Rsa::generate(1024).unwrap());
+                        }
+                    },
+                };
             }
-        },
-        NextState::Login => {
-            let mut state = state::State {
-                mode: state::Mode::Login,
-                name: None,
-                rsa: Some(openssl::rsa::Rsa::generate(1024).unwrap()),
-            };
-
-            loop {
+            Mode::Status => {
+                match read_status_packet(&mut stream)? {
+                    packet::server::StatusPacket::Request(request) => {
+                        slp_status(&mut stream, request)?
+                    }
+                    packet::server::StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
+                };
+            }
+            Mode::Login => {
                 match read_login_packet(&mut stream)? {
                     packet::server::LoginPacket::LoginStart(login_start) => {
                         login::login_start(&mut stream, &mut state, login_start)?
@@ -56,29 +65,30 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
                         login::encryption_response(&mut stream, &mut state, encryption_response)?
                     }
                 };
-                if state.mode == Mode::Play {
-                    break;
-                }
             }
+            Mode::Play => {
+                play::join_game(&mut stream)?;
+                play::client_settings(&mut stream)?;
+                play::held_item_change(&mut stream)?;
+                play::declare_recipes(&mut stream)?;
+                play::tags(&mut stream)?;
+                play::entity_status(&mut stream)?;
+                // play::decrale_commands(&mut stream)?;
+                play::unlock_recipes(&mut stream)?;
+                play::play_position_and_look(&mut stream)?;
+                play::player_info(&mut stream)?;
+                play::update_view_position(&mut stream)?;
+                play::update_light(&mut stream)?;
+                // play::chunk_data(&mut stream)?;
+                play::world_border(&mut stream)?;
+                play::spawn_position(&mut stream)?;
+                play::play_position_and_look(&mut stream)?;
 
-            play::join_game(&mut stream)?;
-            play::client_settings(&mut stream)?;
-            play::held_item_change(&mut stream)?;
-            play::declare_recipes(&mut stream)?;
-            play::tags(&mut stream)?;
-            play::entity_status(&mut stream)?;
-            // play::decrale_commands(&mut stream)?;
-            play::unlock_recipes(&mut stream)?;
-            play::play_position_and_look(&mut stream)?;
-            play::player_info(&mut stream)?;
-            play::update_view_position(&mut stream)?;
-            play::update_light(&mut stream)?;
-            // play::chunk_data(&mut stream)?;
-            play::world_border(&mut stream)?;
-            play::spawn_position(&mut stream)?;
-            play::play_position_and_look(&mut stream)?;
+                state.mode = Mode::Finish;
+            }
+            Mode::Finish => break,
         }
-    };
+    }
 
     println!("==================================");
     Ok(())
