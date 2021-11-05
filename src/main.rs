@@ -23,16 +23,20 @@ pub type AesCfb8 = Cfb8<Aes128>;
 
 use mcstream::McStream;
 
+use crate::packet::read_status_packet;
+
 fn handler(stream: TcpStream) -> Result<(), Error> {
     let mut stream = McStream::new(stream);
     let next_state = match read_handshake_packet(&mut stream)? {
-        HandshakePacket::Handshake { next_state, .. } => next_state,
+        HandshakePacket::Handshake(handshake) => handshake.next_state,
     };
     match next_state {
-        NextState::Status => {
-            slp_status(&mut stream)?;
-            slp_ping(&mut stream)?;
-        }
+        NextState::Status => loop {
+            match read_status_packet(&mut stream)? {
+                packet::server::StatusPacket::Request(request) => slp_status(&mut stream, request)?,
+                packet::server::StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
+            }
+        },
         NextState::Login => {
             let name = login::login_start(&mut stream)?;
             println!("login attempt: {}", name);

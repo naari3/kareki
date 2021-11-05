@@ -9,7 +9,11 @@ pub mod server;
 // use client::*;
 use server::*;
 
-pub trait PacketRead {}
+pub trait PacketRead: ProtocolRead + Sized {
+    fn packet_read(dst: &mut dyn Read) -> io::Result<Self> {
+        Self::proto_decode(dst)
+    }
+}
 
 pub trait PacketWrite: ProtocolWrite + Sized {
     fn packet_write(&self, dst: &mut dyn Write) -> io::Result<()> {
@@ -30,43 +34,13 @@ fn read_packet_meta(stream: &mut dyn Read) -> Result<(u32, u32), Error> {
 }
 
 pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, Error> {
-    let (_, _) = read_packet_meta(stream)?;
-
     println!("get handshake");
-    let protocol_version = <Var<i32>>::proto_decode(stream)?;
-    let server_address = String::proto_decode(stream)?;
-    let server_port = u16::proto_decode(stream)?;
-    let next_state = match <Var<i32>>::proto_decode(stream)? {
-        1 => NextState::Status,
-        2 => NextState::Login,
-        _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
-    };
-
-    Ok(HandshakePacket::Handshake {
-        protocol_version: protocol_version,
-        server_address: server_address,
-        server_port: server_port,
-        next_state: next_state,
-    })
+    Ok(HandshakePacket::proto_decode(stream)?)
 }
 
 pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> {
-    let (_, packet_id) = read_packet_meta(stream)?;
-
-    match packet_id {
-        0 => return Ok(StatusPacket::Request),
-        1 => {
-            return Ok(StatusPacket::Ping {
-                payload: u64::proto_decode(stream)?,
-            })
-        }
-        _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet id",
-            ))
-        }
-    }
+    println!("get status");
+    Ok(StatusPacket::proto_decode(stream)?)
 }
 
 pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
