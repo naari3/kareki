@@ -5,6 +5,8 @@ use serde::{Serialize, Serializer};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
+use crate::packet::client::{Pong, SlpResponse};
+use crate::packet::PacketWrite;
 use crate::protocol::ProtocolWrite;
 use crate::types::Var;
 
@@ -64,7 +66,6 @@ pub fn slp_status(stream: &mut McStream) -> Result<(), Error> {
     match read_status_packet(stream)? {
         StatusPacket::Request => {
             println!("get status request");
-            let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
             let status_response = StatusResponse {
                 description: Description {
@@ -86,15 +87,9 @@ pub fn slp_status(stream: &mut McStream) -> Result<(), Error> {
 
             println!("will send: {}", json_response);
 
-            <Var<i32>>::proto_encode(&0, &mut r)?; // packet_id: 0
-            String::proto_encode(&json_response.to_string(), &mut r)?;
+            let slp_response = SlpResponse { json_response };
+            slp_response.packet_write(stream)?;
 
-            println!("packet size: {}", r.get_ref().len() as i32);
-
-            <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
-            stream.write_all(r.get_ref())?;
-
-            stream.flush()?;
             println!("sent status");
         }
         _ => {
@@ -112,16 +107,10 @@ pub fn slp_ping(stream: &mut McStream) -> Result<(), Error> {
         StatusPacket::Ping { payload } => {
             println!("get ping");
 
-            let mut r = io::Cursor::new(vec![] as Vec<u8>);
-
-            <Var<i32>>::proto_encode(&1, &mut r)?;
-            r.write_u64::<BigEndian>(payload)?;
-
-            <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
-            stream.write_all(&r.get_ref())?;
+            let pong = Pong { payload };
+            pong.packet_write(stream)?;
 
             println!("sent pong");
-            stream.flush()?;
         }
         _ => {
             return Err(io::Error::new(

@@ -1,12 +1,11 @@
-use std::io::{self, Error, Write};
+use std::io::{self, Error};
 
 use super::mcstream::McStream;
 
-use crate::types::{Arr, Var};
+use crate::packet::client::{Disconnect, EncryptionRequest, LoginSuccess, SetCompression};
+use crate::packet::PacketWrite;
 
 use super::packet::{read_login_packet, server::LoginPacket};
-
-use crate::protocol::ProtocolWrite;
 
 use uuid::Uuid;
 
@@ -14,13 +13,10 @@ use openssl::pkey::Private;
 use openssl::rsa::{Padding, Rsa};
 
 pub fn disconnect(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-
-    <Var<i32>>::proto_encode(&0, &mut r)?; // packet_id: 0
-    String::proto_encode(&r#"{"text": "konaide ( ; _ ; )"}"#.to_string(), &mut r)?;
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
-    stream.write_all(r.get_ref())?;
+    let disconnect = Disconnect {
+        chat: r#"{"text": "konaide ( ; _ ; )"}"#.to_string(),
+    };
+    disconnect.packet_write(stream)?;
 
     println!("disconnected");
     Ok(())
@@ -42,23 +38,15 @@ pub fn login_start(stream: &mut McStream) -> Result<String, Error> {
 
 pub fn encryption_request(
     stream: &mut McStream,
-    pubkey: &Vec<u8>,
-    verify_token: &Vec<u8>,
+    public_key: Vec<u8>,
+    verify_token: Vec<u8>,
 ) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let mut dst = io::Cursor::new(vec![] as Vec<u8>);
-
-    <Var<i32>>::proto_encode(&1, &mut r)?; // packet_id: 1
-
-    String::proto_encode(&"".to_string(), &mut r)?;
-    <Arr<Var<i32>, u8>>::proto_encode(&pubkey, &mut r)?;
-    <Arr<Var<i32>, u8>>::proto_encode(&verify_token, &mut r)?;
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), &mut dst)?;
-    dst.write_all(r.get_ref())?;
-
-    stream.write_all(dst.get_ref())?;
-    stream.flush()?;
+    let encryption_request = EncryptionRequest {
+        server_id: "".to_string(),
+        public_key,
+        verify_token,
+    };
+    encryption_request.packet_write(stream)?;
 
     println!("sent encrypted request");
     Ok(())
@@ -116,28 +104,17 @@ pub fn encryption_response(
 }
 
 pub fn set_compression(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    <Var<i32>>::proto_encode(&3, &mut r)?; // packet_id: 3
-    <Var<i32>>::proto_encode(&-1, &mut r)?; // this mean do not compression
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let set_compression = SetCompression {
+        thresshold: -1, // this mean do not compression
+    };
+    set_compression.packet_write(stream)?;
 
     Ok(())
 }
 
-pub fn login_success(stream: &mut McStream, uuid: &Uuid, username: &String) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    <Var<i32>>::proto_encode(&2, &mut r)?; // packet_id: 2
-
-    String::proto_encode(&uuid.to_string(), &mut r)?;
-
-    String::proto_encode(username, &mut r)?;
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+pub fn login_success(stream: &mut McStream, uuid: String, username: String) -> Result<(), Error> {
+    let login_success = LoginSuccess { uuid, username };
+    login_success.packet_write(stream)?;
 
     println!("login successful");
     Ok(())

@@ -13,7 +13,12 @@ pub trait PacketRead {}
 
 pub trait PacketWrite: ProtocolWrite + Sized {
     fn packet_write(&self, dst: &mut dyn Write) -> io::Result<()> {
-        Self::proto_encode(self, dst)
+        let mut r = io::Cursor::new(vec![] as Vec<u8>);
+
+        Self::proto_encode(self, &mut r)?;
+        <Var<i32>>::proto_encode(&(r.get_ref().len() as i32), dst)?;
+        dst.write_all(r.get_ref())?;
+        dst.flush()
     }
 }
 

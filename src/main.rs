@@ -41,7 +41,7 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             let pubkey = rsa.public_key_to_der()?;
             let verify_token = vec![0u8, 123, 212, 123];
 
-            login::encryption_request(&mut stream, &pubkey, &verify_token)?;
+            login::encryption_request(&mut stream, pubkey, verify_token)?;
             let (name, id, props, key) = login::encryption_response(&mut stream, &rsa, &name)?;
             println!(
                 "name: {}, id: {}, props: {:?}, key: {:?}",
@@ -51,7 +51,7 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             stream.set_encryptor(&key);
 
             login::set_compression(&mut stream)?;
-            login::login_success(&mut stream, &id, &name)?;
+            login::login_success(&mut stream, id.to_string(), name)?;
 
             play::join_game(&mut stream)?;
             play::client_settings(&mut stream)?;
