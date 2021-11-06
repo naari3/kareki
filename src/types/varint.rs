@@ -3,6 +3,7 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io;
 use std::io::{Read, Write};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Var<T>(T);
 
 impl ProtocolLen<i32> for Var<i32> {

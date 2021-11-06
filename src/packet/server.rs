@@ -50,6 +50,22 @@ impl ProtocolRead for Handshake {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum NextState {
+    Status,
+    Login,
+}
+
+impl ProtocolRead for NextState {
+    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+        Ok(match <Var<i32>>::proto_decode(src)? {
+            1 => NextState::Status,
+            2 => NextState::Login,
+            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
+        })
+    }
+}
+
 pub enum StatusPacket {
     Request(Request),
     Ping(Ping),
@@ -143,28 +159,58 @@ impl ProtocolRead for EncryptionResponse {
 }
 
 pub enum PlayPacket {
-    ClientSettings {
-        locale: String,
-        view_distance: u8,
-        chat_mode: i32,
-        chat_colors: bool,
-        displayed_skin_parts: u8,
-        main_hand: i32,
-    },
+    ClientSettings(ClientSettings),
+    KeepAlive(KeepAlive),
+}
+
+impl ProtocolRead for PlayPacket {
+    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+        let (_packet_size, packet_id) = read_packet_meta(src)?;
+        Ok(match packet_id {
+            0x05 => PlayPacket::ClientSettings(ClientSettings::proto_decode(src)?),
+            0x0F => PlayPacket::KeepAlive(KeepAlive::proto_decode(src)?),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid PlayPacket",
+                ))
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
-pub enum NextState {
-    Status,
-    Login,
+pub struct ClientSettings {
+    pub locale: String,
+    pub view_distance: u8,
+    pub chat_mode: i32,
+    pub chat_colors: bool,
+    pub displayed_skin_parts: u8,
+    pub main_hand: i32,
 }
 
-impl ProtocolRead for NextState {
+impl ProtocolRead for ClientSettings {
     fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
-        Ok(match <Var<i32>>::proto_decode(src)? {
-            1 => NextState::Status,
-            2 => NextState::Login,
-            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
+        Ok(Self {
+            locale: String::proto_decode(src)?,
+            view_distance: u8::proto_decode(src)?,
+            chat_mode: <Var<i32>>::proto_decode(src)?,
+            chat_colors: bool::proto_decode(src)?,
+            displayed_skin_parts: u8::proto_decode(src)?,
+            main_hand: <Var<i32>>::proto_decode(src)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct KeepAlive {
+    pub id: i64,
+}
+
+impl ProtocolRead for KeepAlive {
+    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+        Ok(Self {
+            id: i64::proto_decode(src)?,
         })
     }
 }

@@ -113,3 +113,23 @@ impl ProtocolWrite for SetCompression {
         Ok(())
     }
 }
+
+pub enum _Play {
+    EntityStatus(EntityStatus), // 0x1C
+}
+
+#[derive(Debug, Clone)]
+pub struct EntityStatus {
+    pub entity_id: i32,
+    pub entity_status: i8,
+}
+impl PacketWrite for EntityStatus {}
+
+impl ProtocolWrite for EntityStatus {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x1C, dst)?; // packet_id: 0x1C
+        i32::proto_encode(&value.entity_id, dst)?;
+        i8::proto_encode(&value.entity_status, dst)?;
+        Ok(())
+    }
+}

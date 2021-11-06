@@ -25,6 +25,7 @@ pub type AesCfb8 = Cfb8<Aes128>;
 
 use mcstream::McStream;
 
+use crate::packet::server::{LoginPacket, StatusPacket};
 use crate::packet::{read_login_packet, read_status_packet};
 use crate::state::Mode;
 
@@ -50,18 +51,16 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             }
             Mode::Status => {
                 match read_status_packet(&mut stream)? {
-                    packet::server::StatusPacket::Request(request) => {
-                        slp_status(&mut stream, request)?
-                    }
-                    packet::server::StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
+                    StatusPacket::Request(request) => slp_status(&mut stream, request)?,
+                    StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
                 };
             }
             Mode::Login => {
                 match read_login_packet(&mut stream)? {
-                    packet::server::LoginPacket::LoginStart(login_start) => {
+                    LoginPacket::LoginStart(login_start) => {
                         login::login_start(&mut stream, &mut state, login_start)?
                     }
-                    packet::server::LoginPacket::EncryptionResponse(encryption_response) => {
+                    LoginPacket::EncryptionResponse(encryption_response) => {
                         login::encryption_response(&mut stream, &mut state, encryption_response)?
                     }
                 };

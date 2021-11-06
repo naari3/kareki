@@ -30,17 +30,10 @@ pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
 
 pub fn client_settings(stream: &mut McStream) -> Result<(), Error> {
     match read_play_packet(stream)? {
-        PlayPacket::ClientSettings {
-            locale,
-            view_distance,
-            chat_mode,
-            chat_colors,
-            displayed_skin_parts,
-            main_hand,
-        } => {
+        PlayPacket::ClientSettings(client_settings) => {
             println!(
                 "locale: {}, view_distance: {}, chat_mode: {}, chat_colors: {}, displayed_skin_parts: {}, main_hand: {}",
-                locale, view_distance, chat_mode, chat_colors, displayed_skin_parts, main_hand
+                client_settings.locale, client_settings.view_distance, client_settings.chat_mode, client_settings.chat_colors, client_settings.displayed_skin_parts, client_settings.main_hand
             );
         }
         _ => {

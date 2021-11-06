@@ -49,24 +49,6 @@ pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
 }
 
 pub fn read_play_packet(stream: &mut dyn Read) -> Result<PlayPacket, Error> {
-    let (_, packet_id) = read_packet_meta(stream)?;
-
-    match packet_id {
-        5 => {
-            return Ok(PlayPacket::ClientSettings {
-                locale: String::proto_decode(stream)?,
-                view_distance: u8::proto_decode(stream)?,
-                chat_mode: <Var<i32>>::proto_decode(stream)?,
-                chat_colors: bool::proto_decode(stream)?,
-                displayed_skin_parts: u8::proto_decode(stream)?,
-                main_hand: <Var<i32>>::proto_decode(stream)?,
-            })
-        }
-        _ => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid packet id",
-            ))
-        }
-    }
+    println!("get status");
+    Ok(PlayPacket::proto_decode(stream)?)
 }
