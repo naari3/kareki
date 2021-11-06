@@ -112,7 +112,7 @@ pub fn encryption_request(
 
 pub fn set_compression(stream: &mut McStream) -> Result<(), Error> {
     let set_compression = SetCompression {
-        thresshold: -1, // this mean do not compression
+        thresshold: (-1 as i32).into(), // this mean do not compression
     };
     set_compression.packet_write(stream)?;
 

@@ -1,15 +1,37 @@
 use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 use byteorder::{ReadBytesExt, WriteBytesExt};
+use std::fmt::Display;
 use std::io;
 use std::io::{Read, Write};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Var<T>(T);
 
-impl ProtocolLen<i32> for Var<i32> {
+impl From<i32> for Var<i32> {
+    fn from(n: i32) -> Self {
+        Self(n)
+    }
+}
+
+impl From<Var<i32>> for i32 {
+    fn from(v: Var<i32>) -> Self {
+        v.0
+    }
+}
+
+impl<T> Display for Var<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ProtocolLen for Var<i32> {
     /// Size in bytes of `value` as a `Var<i32>`
-    fn proto_len(value: &i32) -> usize {
-        let value = *value as u32;
+    fn proto_len(value: &Self) -> usize {
+        let value = value.0 as u32;
         for i in 1..5 {
             if (value & (0xffffffffu32 << (7 * i))) == 0 {
                 return i;
@@ -19,9 +41,9 @@ impl ProtocolLen<i32> for Var<i32> {
     }
 }
 
-impl ProtocolWrite<i32> for Var<i32> {
-    fn proto_encode(value: &i32, dst: &mut dyn Write) -> io::Result<()> {
-        let mut temp = *value as u32;
+impl ProtocolWrite for Var<i32> {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        let mut temp = value.0 as u32;
         loop {
             if (temp & !0x7fu32) == 0 {
                 dst.write_u8(temp as u8)?;
@@ -34,15 +56,15 @@ impl ProtocolWrite<i32> for Var<i32> {
     }
 }
 
-impl ProtocolRead<i32> for Var<i32> {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<i32> {
+impl ProtocolRead for Var<i32> {
+    fn proto_decode(src: &mut dyn Read) -> io::Result<Self> {
         let mut x = 0i32;
 
         for shift in (0u32..32).step_by(7).into_iter() {
             let b = src.read_u8()? as i32;
             x |= (b & 0x7F) << shift;
             if (b & 0x80) == 0 {
-                return Ok(x);
+                return Ok(Var(x));
             }
         }
 

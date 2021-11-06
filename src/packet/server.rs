@@ -6,8 +6,8 @@ use crate::{
 };
 
 fn read_packet_meta(stream: &mut dyn Read) -> std::io::Result<(u32, u32)> {
-    let packet_size = <Var<i32>>::proto_decode(stream)? as u32;
-    let packet_id = <Var<i32>>::proto_decode(stream)? as u32;
+    let packet_size = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
+    let packet_id = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
     println!("packet size: {}, packet_id: {}", packet_size, packet_id);
     Ok((packet_size, packet_id))
 }
@@ -33,7 +33,7 @@ impl ProtocolRead for HandshakePacket {
 
 #[derive(Debug, Clone)]
 pub struct Handshake {
-    pub protocol_version: i32,
+    pub protocol_version: Var<i32>,
     pub server_address: String,
     pub server_port: u16,
     pub next_state: NextState,
@@ -58,7 +58,7 @@ pub enum NextState {
 
 impl ProtocolRead for NextState {
     fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
-        Ok(match <Var<i32>>::proto_decode(src)? {
+        Ok(match <Var<i32>>::proto_decode(src)?.into() {
             1 => NextState::Status,
             2 => NextState::Login,
             _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid state")),
@@ -183,10 +183,10 @@ impl ProtocolRead for PlayPacket {
 pub struct ClientSettings {
     pub locale: String,
     pub view_distance: u8,
-    pub chat_mode: i32,
+    pub chat_mode: Var<i32>,
     pub chat_colors: bool,
     pub displayed_skin_parts: u8,
-    pub main_hand: i32,
+    pub main_hand: Var<i32>,
 }
 
 impl ProtocolRead for ClientSettings {
