@@ -1,7 +1,5 @@
 use std::io::{self, Read, Write};
 
-use byteorder::{ReadBytesExt, WriteBytesExt};
-
 use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 
 impl<T> ProtocolLen for Option<T>

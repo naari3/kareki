@@ -5,12 +5,17 @@ use uuid::Uuid;
 
 use super::mcstream::McStream;
 use crate::packet::client::{
-    AddPlayer, DeclareCommands, DeclareRecipes, EntityStatus, HeldItemChange, JoinGame, PlayerInfo,
-    PlayerInfoAction, PlayerPositionAndLook, Properties, Tags, UnlockRecipes,
+    AddPlayer, ChunkData, DeclareCommands, DeclareRecipes, EntityStatus, HeldItemChange, JoinGame,
+    PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags, UnlockRecipes,
+    UpdateLight, UpdateViewPosition, WorldBorder, WorldBorderAction,
 };
 use crate::packet::PacketWrite;
 use crate::packet::{read_play_packet, server::PlayPacket};
 use crate::protocol::ProtocolWrite;
+use crate::types::chunk_section::ChunkSection;
+use crate::types::heightmap::Heightmaps;
+use crate::types::nbt::Nbt;
+use crate::types::position::Position;
 use crate::types::{Arr, Var};
 
 pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
@@ -128,21 +133,22 @@ pub fn play_position_and_look(stream: &mut McStream) -> Result<(), Error> {
 
 pub fn player_info(stream: &mut McStream) -> Result<(), Error> {
     let player_info = PlayerInfo {
-        action: 0.into(),
-        player: PlayerInfoAction::AddPlayer(vec![AddPlayer {
+        action: PlayerInfoAction::AddPlayer(vec![AddPlayer {
             uuid: Uuid::from_str("7e713126-452c-40e7-9374-c9333d3502ed")
                 .expect("Expected valid uuid"),
             name: "todo".to_owned(),
-            props: vec![Properties {
-                name: "test".to_owned(),
-                value: "var".to_owned(),
-                is_signed: false,
-                signature: None,
-            }],
+            props: vec![
+                // Properties {
+                //     name: "test".to_owned(),
+                //     value: "var".to_owned(),
+                //     is_signed: true,
+                //     signature: Some("yoyo".to_owned()),
+                // }
+            ],
             gamemode: 0.into(),
             ping: 1.into(),
-            has_display_name: true,
-            display_name: Some("yoyo".to_owned()),
+            has_display_name: false,
+            display_name: None,
         }]),
     };
     player_info.packet_write(stream)?;
@@ -151,94 +157,64 @@ pub fn player_info(stream: &mut McStream) -> Result<(), Error> {
 }
 
 pub fn update_view_position(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let r_ref = &mut r;
-
-    <Var<i32>>::proto_encode(&0x41.into(), r_ref)?; // packet id: 0x41
-
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // chunk x
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // chunk z
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32).into(), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let update_view_position = UpdateViewPosition {
+        chunk_x: 0.into(),
+        chunk_y: 1.into(),
+    };
+    update_view_position.packet_write(stream)?;
 
     Ok(())
 }
 
 pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let r_ref = &mut r;
-
-    <Var<i32>>::proto_encode(&0x25.into(), r_ref)?; // packet id: 0x25
-
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // chunk x
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // chunk z
-    <Var<i32>>::proto_encode(&3.into(), r_ref)?; // sky light mask
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // block light mask
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // empty sky light mask
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // empty block light mask
-    <Arr<Var<i32>, u8>>::proto_encode(&[127u8; 2048].to_vec(), &mut r)?; // sky light arrays
-    <Arr<Var<i32>, u8>>::proto_encode(&[127u8; 2048].to_vec(), &mut r)?; // block light arrays
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32).into(), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let update_light = UpdateLight {
+        chunk_x: 0.into(),
+        chunk_z: 0.into(),
+        sky_light_mask: 3.into(),
+        block_light_mask: 0.into(),
+        empty_sky_light_mask: 0.into(),
+        empty_block_light_mask: 0.into(),
+        sky_lights: vec![127; 2048],
+        block_lights: vec![127; 2048],
+    };
+    update_light.packet_write(stream)?;
 
     Ok(())
 }
 
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let r_ref = &mut r;
-
-    <Var<i32>>::proto_encode(&0x22.into(), r_ref)?; // packet id: 0x22
-
-    i32::proto_encode(&0, r_ref)?; // chunk x
-    i32::proto_encode(&0, r_ref)?; // chunk z
-    bool::proto_encode(&true, r_ref)?; // full chunk
-    <Var<i32>>::proto_encode(&3.into(), r_ref)?; // primary bit mask
-    <Arr<Var<i32>, i64>>::proto_encode(&[0; 16 * 16 * 16].to_vec(), &mut r)?; // heightmaps
-    <Arr<Var<i32>, u8>>::proto_encode(&[0; 4 * 4 * 4].to_vec(), &mut r)?; // data
-    <Arr<Var<i32>, i32>>::proto_encode(&[].to_vec(), &mut r)?; // block entities
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32).into(), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let chunk_section = ChunkSection::from_array_and_palette(&[1; 4096], vec![0.into(), 1.into()]);
+    let mut data = vec![];
+    ChunkSection::proto_encode(&chunk_section, &mut data)?;
+    let chunk_data = ChunkData {
+        chunk_x: 0,
+        chunk_z: 0,
+        full_chunk: true,
+        primary_bit_mask: 7.into(),
+        heightmaps: Nbt(Heightmaps::from_array(&[16; 256])),
+        biomes: vec![127.into(); 1024],
+        data,
+        block_entities: vec![],
+    };
+    chunk_data.packet_write(stream)?;
 
     Ok(())
 }
 
 pub fn world_border(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let r_ref = &mut r;
-
-    <Var<i32>>::proto_encode(&0x3E.into(), r_ref)?; // packet id: 0x3E
-
-    <Var<i32>>::proto_encode(&0.into(), r_ref)?; // action
-    f64::proto_encode(&16.0, r_ref)?; // diameter
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32).into(), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let world_border = WorldBorder {
+        action: WorldBorderAction::SetSize { diameter: 16.0 },
+    };
+    world_border.packet_write(stream)?;
 
     Ok(())
 }
 
 pub fn spawn_position(stream: &mut McStream) -> Result<(), Error> {
-    let mut r = io::Cursor::new(vec![] as Vec<u8>);
-    let r_ref = &mut r;
-
-    <Var<i32>>::proto_encode(&0x4E.into(), r_ref)?; // packet id: 0x4E
-
-    u64::proto_encode(
-        &(((0 & 0x3FFFFFFu64) << 38) | ((0 & 0x3FFFFFFu64) << 12) | (64 & 0xFFF) as u64),
-        r_ref,
-    )?; // location
-
-    <Var<i32>>::proto_encode(&(r.get_ref().len() as i32).into(), stream)?;
-    stream.write_all(r.get_ref())?;
-    stream.flush()?;
+    let spawn_position = SpawnPosition {
+        location: Position { x: 0, y: 64, z: 0 },
+    };
+    spawn_position.packet_write(stream)?;
 
     Ok(())
 }

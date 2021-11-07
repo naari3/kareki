@@ -78,7 +78,7 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
                 play::player_info(&mut stream)?;
                 play::update_view_position(&mut stream)?;
                 play::update_light(&mut stream)?;
-                // play::chunk_data(&mut stream)?;
+                play::chunk_data(&mut stream)?;
                 play::world_border(&mut stream)?;
                 play::spawn_position(&mut stream)?;
                 play::play_position_and_look(&mut stream)?;

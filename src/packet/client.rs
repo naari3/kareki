@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use crate::{
     protocol::ProtocolWrite,
-    types::{Arr, Var},
+    types::{
+        block_entity::BlockEntity, heightmap::Heightmaps, nbt::Nbt, position::Position, Arr, Var,
+    },
 };
 
 use super::PacketWrite;
@@ -119,11 +121,16 @@ impl ProtocolWrite for SetCompression {
 pub enum _Play {
     DeclareCommands(DeclareCommands),             // 0x12
     EntityStatus(EntityStatus),                   // 0x1C
+    ChunkData(ChunkData),                         // 0x22
+    UpdateLight(UpdateLight),                     // 0x25
     JoinGame(JoinGame),                           // 0x26
     PlayerInfo(PlayerInfo),                       // 0x34
     PlayerPositionAndLook(PlayerPositionAndLook), // 0x36
     UnlockRecipes(UnlockRecipes),                 // 0x37
+    WorldBorder(WorldBorder),                     // 0x3E
     HeldItemChange(HeldItemChange),               // 0x40
+    UpdateViewPosition(UpdateViewPosition),       // 0x41
+    SpawnPosition(SpawnPosition),                 // 0x4E
     DeclareRecipes(DeclareRecipes),               // 0x5B
     Tags(Tags),                                   // 0x5C
 }
@@ -184,6 +191,66 @@ impl ProtocolWrite for EntityStatus {
 }
 
 #[derive(Debug, Clone)]
+pub struct ChunkData {
+    pub chunk_x: i32,
+    pub chunk_z: i32,
+    pub full_chunk: bool,
+    pub primary_bit_mask: Var<i32>,
+    pub heightmaps: Nbt<Heightmaps>,
+    pub biomes: Vec<i32>,
+    pub data: Vec<u8>,
+    pub block_entities: Vec<Nbt<BlockEntity>>,
+}
+
+impl PacketWrite for ChunkData {}
+
+impl ProtocolWrite for ChunkData {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x22.into(), dst)?; // packet_id: 0x22
+        i32::proto_encode(&value.chunk_x, dst)?;
+        i32::proto_encode(&value.chunk_z, dst)?;
+        bool::proto_encode(&value.full_chunk, dst)?;
+        <Var<i32>>::proto_encode(&value.primary_bit_mask, dst)?;
+        Nbt::proto_encode(&value.heightmaps, dst)?;
+        <Arr<Var<i32>, i32>>::proto_encode(&value.biomes, dst)?;
+        <Arr<Var<i32>, u8>>::proto_encode(&value.data, dst)?;
+        // <Var<i32>>::proto_encode(&((value.data.len() as i32).into()), dst)?;
+        // dst.write_all(&value.data)?; // maybe just write bytes?
+        <Arr<Var<i32>, Nbt<BlockEntity>>>::proto_encode(&value.block_entities, dst)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateLight {
+    pub chunk_x: Var<i32>,
+    pub chunk_z: Var<i32>,
+    pub sky_light_mask: Var<i32>,
+    pub block_light_mask: Var<i32>,
+    pub empty_sky_light_mask: Var<i32>,
+    pub empty_block_light_mask: Var<i32>,
+    pub sky_lights: Vec<u8>,
+    pub block_lights: Vec<u8>,
+}
+impl PacketWrite for UpdateLight {}
+
+impl ProtocolWrite for UpdateLight {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x25.into(), dst)?; // packet_id: 0x25
+        <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
+        <Var<i32>>::proto_encode(&value.chunk_z, dst)?;
+        <Var<i32>>::proto_encode(&value.sky_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.block_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.empty_sky_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.empty_block_light_mask, dst)?;
+        <Arr<Var<i32>, u8>>::proto_encode(&value.sky_lights, dst)?;
+        <Arr<Var<i32>, u8>>::proto_encode(&value.block_lights, dst)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct JoinGame {
     pub entity_id: i32,
     pub game_mode: u8,
@@ -215,16 +282,14 @@ impl ProtocolWrite for JoinGame {
 
 #[derive(Debug, Clone)]
 pub struct PlayerInfo {
-    pub action: Var<i32>,
-    pub player: PlayerInfoAction,
+    pub action: PlayerInfoAction,
 }
 impl PacketWrite for PlayerInfo {}
 
 impl ProtocolWrite for PlayerInfo {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
         <Var<i32>>::proto_encode(&0x34.into(), dst)?; // packet_id: 0x34
-        <Var<i32>>::proto_encode(&value.action, dst)?;
-        PlayerInfoAction::proto_encode(&value.player, dst)?;
+        PlayerInfoAction::proto_encode(&value.action, dst)?;
         Ok(())
     }
 }
@@ -301,18 +366,23 @@ impl ProtocolWrite for PlayerInfoAction {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
         match value {
             PlayerInfoAction::AddPlayer(add_player) => {
+                <Var<i32>>::proto_encode(&0.into(), dst)?;
                 <Arr<Var<i32>, _>>::proto_encode(add_player, dst)?;
             }
             PlayerInfoAction::UpdateGamemode(update_gamemode) => {
+                <Var<i32>>::proto_encode(&1.into(), dst)?;
                 <Arr<Var<i32>, _>>::proto_encode(update_gamemode, dst)?;
             }
             PlayerInfoAction::UpdateLatency(update_latency) => {
+                <Var<i32>>::proto_encode(&2.into(), dst)?;
                 <Arr<Var<i32>, _>>::proto_encode(update_latency, dst)?;
             }
             PlayerInfoAction::UpdateDisplayName(update_display_name) => {
+                <Var<i32>>::proto_encode(&3.into(), dst)?;
                 <Arr<Var<i32>, _>>::proto_encode(update_display_name, dst)?;
             }
             PlayerInfoAction::RemovePlayer(remove_player) => {
+                <Var<i32>>::proto_encode(&4.into(), dst)?;
                 <Arr<Var<i32>, _>>::proto_encode(remove_player, dst)?;
             }
         }
@@ -377,6 +447,107 @@ impl ProtocolWrite for UnlockRecipes {
 }
 
 #[derive(Debug, Clone)]
+pub struct WorldBorder {
+    pub action: WorldBorderAction,
+}
+impl PacketWrite for WorldBorder {}
+
+impl ProtocolWrite for WorldBorder {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x3E.into(), dst)?; // packet_id: 0x3E
+        WorldBorderAction::proto_encode(&value.action, dst)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum WorldBorderAction {
+    SetSize {
+        diameter: f64,
+    },
+    LerpSize {
+        old_diameter: f64,
+        new_diameter: f64,
+        speed: Var<i64>,
+    },
+    SetCenter {
+        x: f64,
+        z: f64,
+    },
+    Initialize {
+        x: f64,
+        z: f64,
+        old_diameter: f64,
+        new_diameter: f64,
+        speed: Var<i64>,
+        portal_teleport_boundary: Var<i32>,
+        warning_time: Var<i32>,
+        warning_blocks: Var<i32>,
+    },
+    SetWarningTime {
+        warning_time: Var<i32>,
+    },
+    SetWarningBlocks {
+        warning_blocks: Var<i32>,
+    },
+}
+
+impl ProtocolWrite for WorldBorderAction {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        match value {
+            WorldBorderAction::SetSize { diameter } => {
+                <Var<i32>>::proto_encode(&0.into(), dst)?;
+                f64::proto_encode(diameter, dst)?;
+            }
+            WorldBorderAction::LerpSize {
+                old_diameter,
+                new_diameter,
+                speed,
+            } => {
+                <Var<i32>>::proto_encode(&1.into(), dst)?;
+                f64::proto_encode(old_diameter, dst)?;
+                f64::proto_encode(new_diameter, dst)?;
+                <Var<i64>>::proto_encode(speed, dst)?;
+            }
+            WorldBorderAction::SetCenter { x, z } => {
+                <Var<i32>>::proto_encode(&2.into(), dst)?;
+                f64::proto_encode(x, dst)?;
+                f64::proto_encode(z, dst)?;
+            }
+            WorldBorderAction::Initialize {
+                x,
+                z,
+                old_diameter,
+                new_diameter,
+                speed,
+                portal_teleport_boundary,
+                warning_time,
+                warning_blocks,
+            } => {
+                <Var<i32>>::proto_encode(&3.into(), dst)?;
+                f64::proto_encode(x, dst)?;
+                f64::proto_encode(z, dst)?;
+                f64::proto_encode(old_diameter, dst)?;
+                f64::proto_encode(new_diameter, dst)?;
+                <Var<i64>>::proto_encode(speed, dst)?;
+                <Var<i32>>::proto_encode(portal_teleport_boundary, dst)?;
+                <Var<i32>>::proto_encode(warning_time, dst)?;
+                <Var<i32>>::proto_encode(warning_blocks, dst)?;
+            }
+            WorldBorderAction::SetWarningTime { warning_time } => {
+                <Var<i32>>::proto_encode(&4.into(), dst)?;
+                <Var<i32>>::proto_encode(warning_time, dst)?;
+            }
+            WorldBorderAction::SetWarningBlocks { warning_blocks } => {
+                <Var<i32>>::proto_encode(&5.into(), dst)?;
+                <Var<i32>>::proto_encode(warning_blocks, dst)?;
+            }
+        };
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct HeldItemChange {
     pub slot: u8,
 }
@@ -386,6 +557,36 @@ impl ProtocolWrite for HeldItemChange {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
         <Var<i32>>::proto_encode(&0x40.into(), dst)?; // packet_id: 0x40
         u8::proto_encode(&value.slot, dst)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateViewPosition {
+    pub chunk_x: Var<i32>,
+    pub chunk_y: Var<i32>,
+}
+impl PacketWrite for UpdateViewPosition {}
+
+impl ProtocolWrite for UpdateViewPosition {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x41.into(), dst)?; // packet_id: 0x41
+        <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
+        <Var<i32>>::proto_encode(&value.chunk_y, dst)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SpawnPosition {
+    pub location: Position,
+}
+impl PacketWrite for SpawnPosition {}
+
+impl ProtocolWrite for SpawnPosition {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x4E.into(), dst)?; // packet_id: 0x4E
+        Position::proto_encode(&value.location, dst)?;
         Ok(())
     }
 }

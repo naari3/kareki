@@ -1,7 +1,7 @@
 use std::io;
 use std::io::{Read, Write};
 
-use super::varint::Var;
+use super::var::Var;
 use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 
 impl ProtocolLen for String {

@@ -1,9 +1,14 @@
 pub mod arr;
+pub mod block_entity;
 pub mod bool;
+pub mod chunk_section;
+pub mod heightmap;
+pub mod nbt;
 pub mod option;
+pub mod position;
 pub mod string;
 pub mod uuid;
-pub mod varint;
+pub mod var;
 
 pub use arr::Arr;
-pub use varint::Var;
+pub use var::Var;

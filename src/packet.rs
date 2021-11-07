@@ -26,13 +26,6 @@ pub trait PacketWrite: ProtocolWrite + Sized {
     }
 }
 
-fn read_packet_meta(stream: &mut dyn Read) -> Result<(u32, u32), Error> {
-    let packet_size = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
-    let packet_id = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
-    println!("packet size: {}, packet_id: {}", packet_size, packet_id);
-    Ok((packet_size, packet_id))
-}
-
 pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, Error> {
     println!("get handshake");
     Ok(HandshakePacket::proto_decode(stream)?)
