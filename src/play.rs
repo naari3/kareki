@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{self, Error, Write};
 use std::str::FromStr;
 
@@ -136,7 +137,7 @@ pub fn player_info(stream: &mut McStream) -> Result<(), Error> {
         action: PlayerInfoAction::AddPlayer(vec![AddPlayer {
             uuid: Uuid::from_str("7e713126-452c-40e7-9374-c9333d3502ed")
                 .expect("Expected valid uuid"),
-            name: "todo".to_owned(),
+            name: "naarisan".to_owned(),
             props: vec![
                 // Properties {
                 //     name: "test".to_owned(),
@@ -183,16 +184,27 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
 }
 
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
-    let chunk_section = ChunkSection::from_array_and_palette(&[1; 4096], vec![0.into(), 1.into()]);
+    let chunk_section = ChunkSection::from_array_and_palette(
+        &[1; 4096],
+        vec![0.into(), 1.into(), 2.into(), 3.into()],
+    );
+    let air_chunk_section = ChunkSection::from_array_and_palette(
+        &[0; 4096],
+        vec![0.into(), 1.into(), 2.into(), 3.into()],
+    );
     let mut data = vec![];
     ChunkSection::proto_encode(&chunk_section, &mut data)?;
+    for _ in 0..15 {
+        ChunkSection::proto_encode(&air_chunk_section, &mut data)?;
+    }
+
     let chunk_data = ChunkData {
         chunk_x: 0,
         chunk_z: 0,
         full_chunk: true,
-        primary_bit_mask: 7.into(),
+        primary_bit_mask: 0b1111111111111111.into(),
         heightmaps: Nbt(Heightmaps::from_array(&[16; 256])),
-        biomes: vec![127.into(); 1024],
+        biomes: Some(vec![127.into(); 1024]),
         data,
         block_entities: vec![],
     };
@@ -203,7 +215,7 @@ pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
 
 pub fn world_border(stream: &mut McStream) -> Result<(), Error> {
     let world_border = WorldBorder {
-        action: WorldBorderAction::SetSize { diameter: 16.0 },
+        action: WorldBorderAction::SetSize { diameter: 32.0 },
     };
     world_border.packet_write(stream)?;
 

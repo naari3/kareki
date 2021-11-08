@@ -4,7 +4,7 @@ use super::{Arr, Var};
 
 #[derive(Debug, Clone)]
 pub struct ChunkSection {
-    block_count: u16,
+    block_count: i16,
     bits_per_block: u8,
     palette: Option<Vec<Var<i32>>>, // Some => indirect, None => direct
     data: Vec<u64>,
@@ -13,7 +13,7 @@ pub struct ChunkSection {
 impl ChunkSection {
     pub fn from_array_and_palette(array: &[u16; 4096], palette: Vec<Var<i32>>) -> Self {
         let bits_per_block = (palette.len() as f64).log2().ceil() as u8;
-        let block_count = array.iter().filter(|&x| *x != 0).count() as u16;
+        let block_count = array.iter().filter(|&x| *x != 0).count() as i16;
         let values_per_u64 = 64 / bits_per_block as usize;
         let length = (array.len() + values_per_u64 - 1) / values_per_u64;
         let mask = (1 << bits_per_block) - 1;
@@ -38,7 +38,7 @@ impl ChunkSection {
 
 impl ProtocolWrite for ChunkSection {
     fn proto_encode(value: &Self, dst: &mut dyn std::io::Write) -> std::io::Result<()> {
-        u16::proto_encode(&value.block_count, dst)?;
+        i16::proto_encode(&value.block_count, dst)?;
         u8::proto_encode(&value.bits_per_block, dst)?;
         // TODO: support Option<Arr>
         match &value.palette {

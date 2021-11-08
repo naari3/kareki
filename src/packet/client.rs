@@ -197,7 +197,7 @@ pub struct ChunkData {
     pub full_chunk: bool,
     pub primary_bit_mask: Var<i32>,
     pub heightmaps: Nbt<Heightmaps>,
-    pub biomes: Vec<i32>,
+    pub biomes: Option<Vec<i32>>,
     pub data: Vec<u8>,
     pub block_entities: Vec<Nbt<BlockEntity>>,
 }
@@ -212,7 +212,11 @@ impl ProtocolWrite for ChunkData {
         bool::proto_encode(&value.full_chunk, dst)?;
         <Var<i32>>::proto_encode(&value.primary_bit_mask, dst)?;
         Nbt::proto_encode(&value.heightmaps, dst)?;
-        <Arr<Var<i32>, i32>>::proto_encode(&value.biomes, dst)?;
+        if let Some(biomes) = &value.biomes {
+            for biome in biomes {
+                i32::proto_encode(biome, dst)?;
+            }
+        }
         <Arr<Var<i32>, u8>>::proto_encode(&value.data, dst)?;
         // <Var<i32>>::proto_encode(&((value.data.len() as i32).into()), dst)?;
         // dst.write_all(&value.data)?; // maybe just write bytes?
