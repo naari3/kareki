@@ -35,6 +35,7 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
         mode: Mode::Handshake,
         name: None,
         rsa: None,
+        uuid: None,
     };
     loop {
         match &state.mode {
@@ -58,7 +59,14 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             Mode::Login => {
                 match read_login_packet(&mut stream)? {
                     LoginPacket::LoginStart(login_start) => {
-                        login::login_start(&mut stream, &mut state, login_start)?
+                        let crack = true;
+                        if crack {
+                            login::crack_login_start(&mut stream, &mut state, login_start)?;
+                            state.mode = Mode::Play;
+                            continue;
+                        } else {
+                            login::login_start(&mut stream, &mut state, login_start)?
+                        }
                     }
                     LoginPacket::EncryptionResponse(encryption_response) => {
                         login::encryption_response(&mut stream, &mut state, encryption_response)?
@@ -75,7 +83,7 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
                 // play::decrale_commands(&mut stream)?;
                 play::unlock_recipes(&mut stream)?;
                 play::play_position_and_look(&mut stream)?;
-                play::player_info(&mut stream)?;
+                play::player_info(&mut stream, &mut state)?;
                 play::update_view_position(&mut stream)?;
                 play::update_light(&mut stream)?;
                 play::chunk_data(&mut stream)?;

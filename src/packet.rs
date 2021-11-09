@@ -1,7 +1,7 @@
 use crate::protocol::{ProtocolRead, ProtocolWrite};
 use std::io::{self, Error, Read, Write};
 
-use crate::types::{Arr, Var};
+use crate::types::Var;
 
 pub mod client;
 pub mod server;

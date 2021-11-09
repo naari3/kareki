@@ -568,7 +568,7 @@ impl ProtocolWrite for HeldItemChange {
 #[derive(Debug, Clone)]
 pub struct UpdateViewPosition {
     pub chunk_x: Var<i32>,
-    pub chunk_y: Var<i32>,
+    pub chunk_z: Var<i32>,
 }
 impl PacketWrite for UpdateViewPosition {}
 
@@ -576,7 +576,7 @@ impl ProtocolWrite for UpdateViewPosition {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
         <Var<i32>>::proto_encode(&0x41.into(), dst)?; // packet_id: 0x41
         <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
-        <Var<i32>>::proto_encode(&value.chunk_y, dst)?;
+        <Var<i32>>::proto_encode(&value.chunk_z, dst)?;
         Ok(())
     }
 }

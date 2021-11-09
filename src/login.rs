@@ -1,4 +1,5 @@
 use std::io::{self, Error};
+use std::str::FromStr;
 
 use super::mcstream::McStream;
 
@@ -8,6 +9,21 @@ use crate::packet::PacketWrite;
 use crate::state::{Mode, State};
 
 use openssl::rsa::Padding;
+use uuid::Uuid;
+
+pub fn crack_login_start(
+    stream: &mut McStream,
+    state: &mut State,
+    _login_start: LoginStart,
+) -> Result<(), Error> {
+    // crack
+    let uuid = Uuid::from_str("af6c5ee2-8eeb-8099-b8ce-253c50b0d8a8").unwrap();
+    login_success(stream, uuid.to_string(), "todo".to_string())?;
+    state.uuid = Some(uuid);
+    state.name = Some("todo".to_string());
+
+    return Ok(());
+}
 
 pub fn login_start(
     stream: &mut McStream,
@@ -78,7 +94,9 @@ pub fn encryption_response(
     stream.set_encryptor(&key);
 
     set_compression(stream)?;
+    state.name = Some(name.clone());
     login_success(stream, uuid.to_string(), name)?;
+    state.uuid = Some(uuid);
     state.mode = Mode::Play;
 
     Ok(())

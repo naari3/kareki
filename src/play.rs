@@ -1,8 +1,4 @@
-use std::fs::File;
-use std::io::{self, Error, Write};
-use std::str::FromStr;
-
-use uuid::Uuid;
+use std::io::{self, Error};
 
 use super::mcstream::McStream;
 use crate::packet::client::{
@@ -13,11 +9,11 @@ use crate::packet::client::{
 use crate::packet::PacketWrite;
 use crate::packet::{read_play_packet, server::PlayPacket};
 use crate::protocol::ProtocolWrite;
+use crate::state::State;
 use crate::types::chunk_section::ChunkSection;
 use crate::types::heightmap::Heightmaps;
 use crate::types::nbt::Nbt;
 use crate::types::position::Position;
-use crate::types::{Arr, Var};
 
 pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
     let join_game = JoinGame {
@@ -28,7 +24,7 @@ pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
         max_players: 3,
         level_type: "flat".to_owned(),
         view_distance: 1.into(),
-        reduced_debug_info: true,
+        reduced_debug_info: false,
         enable_respawn_screen: true,
     };
 
@@ -124,7 +120,7 @@ pub fn play_position_and_look(stream: &mut McStream) -> Result<(), Error> {
         z: 0.0,
         yaw: 0.0,
         pitch: 0.0,
-        flags: 0x1F,
+        flags: 0,
         teleport_id: 0.into(),
     };
     play_position_and_look.packet_write(stream)?;
@@ -132,12 +128,11 @@ pub fn play_position_and_look(stream: &mut McStream) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn player_info(stream: &mut McStream) -> Result<(), Error> {
+pub fn player_info(stream: &mut McStream, state: &mut State) -> Result<(), Error> {
     let player_info = PlayerInfo {
         action: PlayerInfoAction::AddPlayer(vec![AddPlayer {
-            uuid: Uuid::from_str("7e713126-452c-40e7-9374-c9333d3502ed")
-                .expect("Expected valid uuid"),
-            name: "naarisan".to_owned(),
+            uuid: state.uuid.as_ref().unwrap().clone(),
+            name: state.name.as_ref().unwrap().to_string(),
             props: vec![
                 // Properties {
                 //     name: "test".to_owned(),
@@ -160,7 +155,7 @@ pub fn player_info(stream: &mut McStream) -> Result<(), Error> {
 pub fn update_view_position(stream: &mut McStream) -> Result<(), Error> {
     let update_view_position = UpdateViewPosition {
         chunk_x: 0.into(),
-        chunk_y: 1.into(),
+        chunk_z: 1.into(),
     };
     update_view_position.packet_write(stream)?;
 
@@ -184,31 +179,35 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
 }
 
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
-    let chunk_section = ChunkSection::from_array_and_palette(
-        &[1; 4096],
-        vec![0.into(), 1.into(), 2.into(), 3.into()],
-    );
-    let air_chunk_section = ChunkSection::from_array_and_palette(
-        &[0; 4096],
-        vec![0.into(), 1.into(), 2.into(), 3.into()],
-    );
-    let mut data = vec![];
-    ChunkSection::proto_encode(&chunk_section, &mut data)?;
-    for _ in 0..15 {
-        ChunkSection::proto_encode(&air_chunk_section, &mut data)?;
-    }
+    for x in 0..4 {
+        for z in 0..4 {
+            let chunk_section = ChunkSection::from_array_and_palette(
+                &[2; 4096],
+                vec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
+            );
+            let air_chunk_section = ChunkSection::from_array_and_palette(
+                &[0; 4096],
+                vec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
+            );
+            let mut data = vec![];
+            ChunkSection::proto_encode(&chunk_section, &mut data)?;
+            for _ in 0..15 {
+                ChunkSection::proto_encode(&air_chunk_section, &mut data)?;
+            }
 
-    let chunk_data = ChunkData {
-        chunk_x: 0,
-        chunk_z: 0,
-        full_chunk: true,
-        primary_bit_mask: 0b1111111111111111.into(),
-        heightmaps: Nbt(Heightmaps::from_array(&[16; 256])),
-        biomes: Some(vec![127.into(); 1024]),
-        data,
-        block_entities: vec![],
-    };
-    chunk_data.packet_write(stream)?;
+            let chunk_data = ChunkData {
+                chunk_x: x,
+                chunk_z: z,
+                full_chunk: true,
+                primary_bit_mask: 0b1111111111111111.into(),
+                heightmaps: Nbt(Heightmaps::from_array(&[16; 256])),
+                biomes: Some(vec![127.into(); 1024]),
+                data,
+                block_entities: vec![],
+            };
+            chunk_data.packet_write(stream)?;
+        }
+    }
 
     Ok(())
 }

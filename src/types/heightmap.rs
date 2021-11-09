@@ -18,7 +18,6 @@ impl Heightmaps {
     pub fn from_array(array: &[u16; 256]) -> Self {
         let mut yoyobits = [0i64; 36];
         let bits_per_byte = 9;
-        let values_per_u64 = 64 / bits_per_byte as usize;
         // let length = (array.len() + values_per_u64 - 1) / values_per_u64;
         let mask = (1 << bits_per_byte) - 1;
         let mut bits = [0u64; 36];
