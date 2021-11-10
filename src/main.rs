@@ -1,6 +1,5 @@
 use std::io::Error;
-use std::net::{TcpListener, TcpStream};
-use std::thread;
+use std::net::TcpStream;
 
 mod mcstream;
 pub mod packet;

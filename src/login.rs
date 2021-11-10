@@ -32,6 +32,7 @@ pub fn login_start(
     state: &mut State,
     login_start: LoginStart,
 ) -> Result<(), Error> {
+    state.rsa = Some(openssl::rsa::Rsa::generate(1024).unwrap());
     let public_key = state
         .rsa
         .as_ref()
