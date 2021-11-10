@@ -158,8 +158,9 @@ impl ProtocolRead for EncryptionResponse {
 }
 
 pub enum PlayPacket {
-    ClientSettings(ClientSettings),
-    KeepAlive(KeepAlive),
+    /* 0x05 */ ClientSettings(ClientSettings),
+    /* 0x0F */ KeepAlive(KeepAlive),
+    /* 0x12 */ PlayerPositionAndRotation(PlayerPositionAndRotation),
 }
 
 impl ProtocolRead for PlayPacket {
@@ -168,6 +169,9 @@ impl ProtocolRead for PlayPacket {
         Ok(match packet_id {
             0x05 => PlayPacket::ClientSettings(ClientSettings::proto_decode(src)?),
             0x0F => PlayPacket::KeepAlive(KeepAlive::proto_decode(src)?),
+            0x12 => {
+                PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
+            }
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -210,6 +214,29 @@ impl ProtocolRead for KeepAlive {
     fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
         Ok(Self {
             id: i64::proto_decode(src)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PlayerPositionAndRotation {
+    pub x: f64,
+    pub feet_y: f64,
+    pub z: f64,
+    pub yaw: f32,
+    pub pitch: f32,
+    pub on_ground: bool,
+}
+
+impl ProtocolRead for PlayerPositionAndRotation {
+    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+        Ok(Self {
+            x: f64::proto_decode(src)?,
+            feet_y: f64::proto_decode(src)?,
+            z: f64::proto_decode(src)?,
+            yaw: f32::proto_decode(src)?,
+            pitch: f32::proto_decode(src)?,
+            on_ground: bool::proto_decode(src)?,
         })
     }
 }

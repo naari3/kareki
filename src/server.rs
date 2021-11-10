@@ -68,6 +68,12 @@ impl Client {
                 PlayPacket::KeepAlive(keep_alive) => {
                     println!("keep alive: {:?}", keep_alive);
                 }
+                PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
+                    println!(
+                        "player position and rotation: {:?}",
+                        player_position_and_rotation
+                    );
+                }
             },
             Err(_) => {}
         }
@@ -176,13 +182,23 @@ impl Server {
                 Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
             }
         }
-        for client in self.clients.iter_mut() {
+        let mut will_remove = vec![];
+        for (index, client) in self.clients.iter_mut().enumerate() {
             match client.update_play() {
                 Ok(_) => {}
                 Err(err) => {
-                    println!("err: {:?}", err)
+                    match err.kind() {
+                        ErrorKind::BrokenPipe => {
+                            will_remove.push(index);
+                        }
+                        _ => {}
+                    }
+                    println!("err: {:?}", err);
                 }
             }
+        }
+        for index in will_remove {
+            self.clients.remove(index);
         }
 
         Ok(())
