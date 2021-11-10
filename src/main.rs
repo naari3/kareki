@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 mod mcstream;
-mod packet;
+pub mod packet;
 mod protocol;
 mod types;
 
@@ -11,12 +11,14 @@ mod login;
 mod play;
 mod slp;
 
+mod server;
 mod state;
 
-use slp::{slp_ping, slp_status};
+use server::Server;
+use slp::{handle_slp_ping, handle_slp_status};
 
 use packet::read_handshake_packet;
-use packet::server::{HandshakePacket, NextState};
+pub use packet::server::{HandshakePacket, NextState};
 
 use aes::Aes128;
 use cfb8::Cfb8;
@@ -31,12 +33,7 @@ use crate::state::Mode;
 
 fn handler(stream: TcpStream) -> Result<(), Error> {
     let mut stream = McStream::new(stream);
-    let mut state = state::State {
-        mode: Mode::Handshake,
-        name: None,
-        rsa: None,
-        uuid: None,
-    };
+    let mut state = state::State::default();
     loop {
         match &state.mode {
             Mode::Handshake => {
@@ -52,8 +49,8 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
             }
             Mode::Status => {
                 match read_status_packet(&mut stream)? {
-                    StatusPacket::Request(request) => slp_status(&mut stream, request)?,
-                    StatusPacket::Ping(ping) => slp_ping(&mut stream, ping)?,
+                    StatusPacket::Request(request) => handle_slp_status(&mut stream, request)?,
+                    StatusPacket::Ping(ping) => handle_slp_ping(&mut stream, ping)?,
                 };
             }
             Mode::Login => {
@@ -91,9 +88,8 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
                 play::spawn_position(&mut stream)?;
                 play::play_position_and_look(&mut stream)?;
 
-                state.mode = Mode::Finish;
+                break;
             }
-            Mode::Finish => break,
         }
     }
 
@@ -103,16 +99,8 @@ fn handler(stream: TcpStream) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() {
-    let listener = TcpListener::bind("0.0.0.0:25565").expect("Error. failed to bind.");
-    for streams in listener.incoming() {
-        match streams {
-            Err(e) => eprintln!("error: {}", e),
-            Ok(stream) => {
-                println!("connection from {:?}", stream.peer_addr());
-                thread::spawn(move || {
-                    handler(stream).unwrap_or_else(|error| eprintln!("{:?}", error));
-                });
-            }
-        }
+    let mut server = Server::new("0.0.0.0:25565".to_string());
+    loop {
+        server.loop_once().unwrap();
     }
 }

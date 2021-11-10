@@ -1,4 +1,5 @@
 use std::io::{self, Error};
+use std::net::TcpStream;
 use std::str::FromStr;
 
 use super::mcstream::McStream;
@@ -21,6 +22,7 @@ pub fn crack_login_start(
     login_success(stream, uuid.to_string(), "todo".to_string())?;
     state.uuid = Some(uuid);
     state.name = Some("todo".to_string());
+    state.crack = true;
 
     return Ok(());
 }
@@ -46,20 +48,20 @@ pub fn login_start(
 pub fn encryption_response(
     stream: &mut McStream,
     state: &mut State,
-    enctyption_response: EncryptionResponse,
+    encryption_response: EncryptionResponse,
 ) -> Result<(), Error> {
     println!("receive encryption response");
     // use mojang_api::ServerAuthResponse;
 
     let mut decoded_shared_secret = vec![0; state.rsa.as_ref().unwrap().size() as usize];
     state.rsa.as_ref().unwrap().private_decrypt(
-        &enctyption_response.shared_secret,
+        &encryption_response.shared_secret,
         &mut decoded_shared_secret,
         Padding::PKCS1,
     )?;
     let mut decoded_verify_token = vec![0; state.rsa.as_ref().unwrap().size() as usize];
     state.rsa.as_ref().unwrap().private_decrypt(
-        &enctyption_response.verify_token,
+        &encryption_response.verify_token,
         &mut decoded_verify_token,
         Padding::PKCS1,
     )?;

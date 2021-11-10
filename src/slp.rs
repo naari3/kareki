@@ -1,11 +1,11 @@
-use std::io::Error;
+use std::io::{Error, Read, Write};
 
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
 use crate::packet::client::{Pong, SlpResponse};
-use crate::packet::server::{Ping, Request};
-use crate::packet::PacketWrite;
+use crate::packet::server::{Ping, Request, StatusPacket};
+use crate::packet::{read_status_packet, PacketWrite};
 
 use super::mcstream::McStream;
 
@@ -57,7 +57,10 @@ impl Serialize for StatusResponse {
     }
 }
 
-pub fn slp_status(stream: &mut McStream, _request: Request) -> Result<(), Error> {
+pub fn handle_slp_status<T>(stream: &mut T, _request: Request) -> Result<(), Error>
+where
+    T: Read + Write,
+{
     println!("get status request");
 
     let status_response = StatusResponse {
@@ -87,7 +90,7 @@ pub fn slp_status(stream: &mut McStream, _request: Request) -> Result<(), Error>
     Ok(())
 }
 
-pub fn slp_ping(stream: &mut McStream, ping: Ping) -> Result<(), Error> {
+pub fn handle_slp_ping(stream: &mut McStream, ping: Ping) -> Result<(), Error> {
     println!("get ping");
 
     let pong = Pong {
