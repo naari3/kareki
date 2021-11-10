@@ -8,7 +8,6 @@ use crate::{
 fn read_packet_meta(stream: &mut dyn Read) -> std::io::Result<(u32, u32)> {
     let packet_size = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
     let packet_id = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
-    println!("packet size: {}, packet_id: {}", packet_size, packet_id);
     Ok((packet_size, packet_id))
 }
 

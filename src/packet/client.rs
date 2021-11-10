@@ -121,6 +121,7 @@ impl ProtocolWrite for SetCompression {
 pub enum _Play {
     DeclareCommands(DeclareCommands),             // 0x12
     EntityStatus(EntityStatus),                   // 0x1C
+    KeepAlive(KeepAlive),                         // 0x21
     ChunkData(ChunkData),                         // 0x22
     UpdateLight(UpdateLight),                     // 0x25
     JoinGame(JoinGame),                           // 0x26
@@ -186,6 +187,20 @@ impl ProtocolWrite for EntityStatus {
         <Var<i32>>::proto_encode(&0x1C.into(), dst)?; // packet_id: 0x1C
         i32::proto_encode(&value.entity_id, dst)?;
         i8::proto_encode(&value.entity_status, dst)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct KeepAlive {
+    pub keep_alive_id: i64,
+}
+impl PacketWrite for KeepAlive {}
+
+impl ProtocolWrite for KeepAlive {
+    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&0x21.into(), dst)?; // packet_id: 0x21
+        i64::proto_encode(&value.keep_alive_id, dst)?;
         Ok(())
     }
 }

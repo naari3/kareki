@@ -27,21 +27,17 @@ pub trait PacketWrite: ProtocolWrite + Sized {
 }
 
 pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, Error> {
-    println!("get handshake");
     Ok(HandshakePacket::proto_decode(stream)?)
 }
 
 pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> {
-    println!("get status");
     Ok(StatusPacket::proto_decode(stream)?)
 }
 
 pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
-    println!("get status");
     Ok(LoginPacket::proto_decode(stream)?)
 }
 
 pub fn read_play_packet(stream: &mut dyn Read) -> Result<PlayPacket, Error> {
-    println!("get status");
     Ok(PlayPacket::proto_decode(stream)?)
 }

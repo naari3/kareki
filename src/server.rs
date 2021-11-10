@@ -1,12 +1,10 @@
 use std::{
     io::{self, Cursor, ErrorKind, Read, Result},
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     sync::mpsc::{self, Receiver},
     thread::{self, sleep},
     time::{Duration, Instant},
 };
-
-use bytes::BytesMut;
 
 use crate::protocol::ProtocolRead;
 use crate::{
@@ -15,10 +13,10 @@ use crate::{
     packet::{
         read_login_packet, read_play_packet,
         server::{LoginPacket, PlayPacket},
-        PacketRead, PacketWrite,
+        PacketWrite,
     },
     play,
-    state::{Mode, State},
+    state::State,
     types::Var,
     HandshakePacket,
 };
@@ -62,14 +60,25 @@ impl Client {
     }
 
     fn update_play(&mut self) -> Result<()> {
-        match read_play_packet(&mut self.stream)? {
-            PlayPacket::ClientSettings(_client_settings) => {}
-            PlayPacket::KeepAlive(_keep_alive) => {}
+        match read_play_packet(&mut self.stream) {
+            Ok(play_packet) => match play_packet {
+                PlayPacket::ClientSettings(client_settings) => {
+                    println!("client settings: {:?}", client_settings);
+                }
+                PlayPacket::KeepAlive(keep_alive) => {
+                    println!("keep alive: {:?}", keep_alive);
+                }
+            },
+            Err(_) => {}
+        }
+        if self.state.last_keep_alive.elapsed().as_secs() > 10 {
+            self.state.last_keep_alive = Instant::now();
+            play::keep_alive(self)?;
         }
         Ok(())
     }
 
-    fn write_packet<P>(&mut self, packet: P) -> Result<()>
+    pub fn write_packet<P>(&mut self, packet: P) -> Result<()>
     where
         P: PacketWrite,
     {
@@ -168,7 +177,12 @@ impl Server {
             }
         }
         for client in self.clients.iter_mut() {
-            client.update_play()?
+            match client.update_play() {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("err: {:?}", err)
+                }
+            }
         }
 
         Ok(())

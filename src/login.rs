@@ -1,5 +1,4 @@
 use std::io::{self, Error};
-use std::net::TcpStream;
 use std::str::FromStr;
 
 use super::mcstream::McStream;

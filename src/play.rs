@@ -1,14 +1,16 @@
 use std::io::{self, Error};
+use std::time::SystemTime;
 
 use super::mcstream::McStream;
 use crate::packet::client::{
     AddPlayer, ChunkData, DeclareCommands, DeclareRecipes, EntityStatus, HeldItemChange, JoinGame,
-    PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags, UnlockRecipes,
-    UpdateLight, UpdateViewPosition, WorldBorder, WorldBorderAction,
+    KeepAlive, PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags,
+    UnlockRecipes, UpdateLight, UpdateViewPosition, WorldBorder, WorldBorderAction,
 };
 use crate::packet::PacketWrite;
 use crate::packet::{read_play_packet, server::PlayPacket};
 use crate::protocol::ProtocolWrite;
+use crate::server::Client;
 use crate::state::State;
 use crate::types::chunk_section::ChunkSection;
 use crate::types::heightmap::Heightmaps;
@@ -179,8 +181,8 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
 }
 
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
-    for x in 0..4 {
-        for z in 0..4 {
+    for x in -2..2 {
+        for z in -2..2 {
             let chunk_section = ChunkSection::from_array_and_palette(
                 &[2; 4096],
                 vec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
@@ -226,6 +228,18 @@ pub fn spawn_position(stream: &mut McStream) -> Result<(), Error> {
         location: Position { x: 0, y: 64, z: 0 },
     };
     spawn_position.packet_write(stream)?;
+
+    Ok(())
+}
+
+pub fn keep_alive(client: &mut Client) -> Result<(), Error> {
+    let packet = KeepAlive {
+        keep_alive_id: SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+    };
+    client.write_packet(packet)?;
 
     Ok(())
 }
