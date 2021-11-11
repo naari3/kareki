@@ -12,7 +12,10 @@ pub struct ChunkSection {
 
 impl ChunkSection {
     pub fn from_array_and_palette(array: &[u16; 4096], palette: Vec<Var<i32>>) -> Self {
-        let bits_per_block = (palette.len() as f64).log2().ceil() as u8;
+        let mut bits_per_block = (palette.len() as f64).log2().ceil() as u8;
+        if bits_per_block < 4 {
+            bits_per_block = 4;
+        }
         let block_count = array.iter().filter(|&x| *x != 0).count() as i16;
         let values_per_u64 = 64 / bits_per_block as usize;
         let length = (array.len() + values_per_u64 - 1) / values_per_u64;

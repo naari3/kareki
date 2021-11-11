@@ -217,7 +217,7 @@ pub fn handle_status_handshake(stream: &mut McStream) -> Result<()> {
 
 pub fn handle_login_handshake(stream: &mut McStream, state: &mut State) -> Result<()> {
     if let LoginPacket::LoginStart(start) = read_login_packet(stream)? {
-        let crack = false;
+        let crack = true;
         if crack {
             login::crack_login_start(stream, state, start)?;
         } else {

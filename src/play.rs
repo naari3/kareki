@@ -25,7 +25,7 @@ pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
         hashed_seed: 0,
         max_players: 3,
         level_type: "flat".to_owned(),
-        view_distance: 1.into(),
+        view_distance: 2.into(),
         reduced_debug_info: false,
         enable_respawn_screen: true,
     };
@@ -183,27 +183,18 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
     for x in -2..2 {
         for z in -2..2 {
-            let chunk_section = ChunkSection::from_array_and_palette(
-                &[2; 4096],
-                vec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
-            );
-            let air_chunk_section = ChunkSection::from_array_and_palette(
-                &[0; 4096],
-                vec![0.into(), 1.into(), 2.into(), 3.into(), 4.into()],
-            );
+            let chunk_section =
+                ChunkSection::from_array_and_palette(&[1; 4096], vec![0.into(), 1.into()]);
             let mut data = vec![];
             ChunkSection::proto_encode(&chunk_section, &mut data)?;
-            for _ in 0..15 {
-                ChunkSection::proto_encode(&air_chunk_section, &mut data)?;
-            }
 
             let chunk_data = ChunkData {
                 chunk_x: x,
                 chunk_z: z,
                 full_chunk: true,
-                primary_bit_mask: 0b1111111111111111.into(),
-                heightmaps: Nbt(Heightmaps::from_array(&[16; 256])),
-                biomes: Some(vec![127.into(); 1024]),
+                primary_bit_mask: 1.into(),
+                heightmaps: Nbt(Heightmaps::from_array(&[0; 256])),
+                biomes: Some(vec![0.into(); 1024]),
                 data,
                 block_entities: vec![],
             };
