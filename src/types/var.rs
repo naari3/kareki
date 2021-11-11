@@ -5,7 +5,7 @@ use std::io;
 use std::io::{Read, Write};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Var<T>(T);
+pub struct Var<T>(pub T);
 
 impl From<i32> for Var<i32> {
     fn from(n: i32) -> Self {

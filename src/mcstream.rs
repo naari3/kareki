@@ -62,7 +62,7 @@ impl Write for McStream {
         self.buffer.write(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        println!("plain: {:?}", self.buffer);
+        // println!("plain: {:?}", self.buffer);
         if let Some(encryptor) = self.encryptor.as_mut() {
             encryptor.encrypt(&mut self.buffer);
         }

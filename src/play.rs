@@ -12,6 +12,7 @@ use crate::packet::{read_play_packet, server::PlayPacket};
 use crate::protocol::ProtocolWrite;
 use crate::server::Client;
 use crate::state::State;
+use crate::types::chunk::Chunk;
 use crate::types::chunk_section::ChunkSection;
 use crate::types::heightmap::Heightmaps;
 use crate::types::nbt::Nbt;
@@ -25,7 +26,7 @@ pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
         hashed_seed: 0,
         max_players: 3,
         level_type: "flat".to_owned(),
-        view_distance: 2.into(),
+        view_distance: 4.into(),
         reduced_debug_info: false,
         enable_respawn_screen: true,
     };
@@ -181,18 +182,37 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
 }
 
 pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
+    let mut chunk = Chunk::empty();
+    for x in 0..16 {
+        for z in 0..16 {
+            for y in 0..16 {
+                if !(14 > x && x >= 2 && 14 > z && z >= 2) {
+                    chunk.set_block(x, y + 90, z, 150 + (y / 2) as u16)?;
+                }
+                if !(14 > x && x >= 2 && 14 > z && z >= 2) {
+                    chunk.set_block(x, y + 68, z, 200 + (y / 2) as u16)?;
+                }
+                if !(12 > x && x >= 4 && 12 > z && z >= 4) {
+                    chunk.set_block(x, y + 48, z, 100 + (y / 2) as u16)?;
+                }
+                if (x + y + z) / 4 % 3 != 0 {
+                    chunk.set_block(x, y, z, (((x + y + z) % 8) + 1) as u16)?;
+                }
+            }
+        }
+    }
     for x in -2..2 {
         for z in -2..2 {
-            let chunk_section =
-                ChunkSection::from_array_and_palette(&[1; 4096], vec![0.into(), 1.into()]);
             let mut data = vec![];
-            ChunkSection::proto_encode(&chunk_section, &mut data)?;
+            for section in chunk.sections.iter() {
+                ChunkSection::proto_encode(section, &mut data)?;
+            }
 
             let chunk_data = ChunkData {
                 chunk_x: x,
                 chunk_z: z,
                 full_chunk: true,
-                primary_bit_mask: 1.into(),
+                primary_bit_mask: 0b1111111111111111.into(),
                 heightmaps: Nbt(Heightmaps::from_array(&[0; 256])),
                 biomes: Some(vec![0.into(); 1024]),
                 data,
@@ -207,7 +227,7 @@ pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
 
 pub fn world_border(stream: &mut McStream) -> Result<(), Error> {
     let world_border = WorldBorder {
-        action: WorldBorderAction::SetSize { diameter: 32.0 },
+        action: WorldBorderAction::SetSize { diameter: 128.0 },
     };
     world_border.packet_write(stream)?;
 

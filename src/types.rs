@@ -1,6 +1,7 @@
 pub mod arr;
 pub mod block_entity;
 pub mod bool;
+pub mod chunk;
 pub mod chunk_section;
 pub mod heightmap;
 pub mod nbt;
