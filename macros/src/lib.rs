@@ -92,7 +92,6 @@ pub fn derive_protocol_write(input: proc_macro::TokenStream) -> proc_macro::Toke
     let expanded = quote! {
         impl ProtocolWrite for #name {
             fn proto_encode(value: &Self, dst: &mut dyn Write) -> std::io::Result<()> {
-                <Var<i32>>::proto_encode(&Self::packet_id().into(), dst)?;
                 #encodes
 
                 Ok(())
