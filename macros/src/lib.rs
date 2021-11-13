@@ -5,6 +5,18 @@ use syn::{
     Type,
 };
 
+#[proc_macro_derive(PacketWrite)]
+pub fn derive_packet_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let name = input.ident;
+
+    let expanded = quote! {
+        impl PacketWrite for #name {}
+    };
+    proc_macro::TokenStream::from(expanded)
+}
+
 #[proc_macro_derive(ProtocolRead)]
 pub fn derive_protocol_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

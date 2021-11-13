@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 
+use kareki_macros::{PacketWrite, ProtocolWrite};
 use uuid::Uuid;
 
 use crate::{
@@ -15,36 +16,16 @@ pub enum _StatusPacket {
     Pong(Pong),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x00]
 pub struct SlpResponse {
     pub json_response: String,
 }
 
-impl PacketWrite for SlpResponse {}
-
-impl ProtocolWrite for SlpResponse {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0.into(), dst)?; // packet_id: 0
-
-        String::proto_encode(&value.json_response, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x01]
 pub struct Pong {
     pub payload: u64,
-}
-
-impl PacketWrite for Pong {}
-
-impl ProtocolWrite for Pong {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&1.into(), dst)?; // packet_id: 1
-
-        u64::proto_encode(&value.payload, dst)?;
-        Ok(())
-    }
 }
 
 pub enum _Login {
@@ -53,69 +34,31 @@ pub enum _Login {
     LoginSuccess(LoginSuccess),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x00]
 pub struct Disconnect {
     pub chat: String,
 }
 
-impl PacketWrite for Disconnect {}
-
-impl ProtocolWrite for Disconnect {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0.into(), dst)?; // packet_id: 1
-
-        String::proto_encode(&value.chat, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x01]
 pub struct EncryptionRequest {
     pub server_id: String,
     pub public_key: Vec<u8>,
     pub verify_token: Vec<u8>,
 }
-impl PacketWrite for EncryptionRequest {}
 
-impl ProtocolWrite for EncryptionRequest {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&1.into(), dst)?; // packet_id: 1
-
-        String::proto_encode(&value.server_id, dst)?;
-        <Arr<Var<i32>, u8>>::proto_encode(&value.public_key, dst)?;
-        <Arr<Var<i32>, u8>>::proto_encode(&value.verify_token, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x02]
 pub struct LoginSuccess {
     pub uuid: String,
     pub username: String,
 }
-impl PacketWrite for LoginSuccess {}
 
-impl ProtocolWrite for LoginSuccess {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&2.into(), dst)?; // packet_id: 2
-        String::proto_encode(&value.uuid.to_string(), dst)?;
-        String::proto_encode(&value.username, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x03]
 pub struct SetCompression {
     pub thresshold: Var<i32>,
-}
-impl PacketWrite for SetCompression {}
-
-impl ProtocolWrite for SetCompression {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&3.into(), dst)?; // packet_id: 3
-        <Var<i32>>::proto_encode(&value.thresshold, dst)?;
-        Ok(())
-    }
 }
 
 pub enum _Play {
@@ -136,20 +79,11 @@ pub enum _Play {
     Tags(Tags),                                   // 0x5C
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x12]
 pub struct DeclareCommands {
     pub nodes: Vec<Node>,
     pub root_index: Var<i32>,
-}
-impl PacketWrite for DeclareCommands {}
-
-impl ProtocolWrite for DeclareCommands {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x12.into(), dst)?; // packet_id: 0x12
-        <Arr<Var<i32>, Node>>::proto_encode(&value.nodes, dst)?;
-        <Var<i32>>::proto_encode(&value.root_index, dst)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -175,37 +109,21 @@ impl ProtocolWrite for Node {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x1C]
 pub struct EntityStatus {
     pub entity_id: i32,
     pub entity_status: i8,
 }
-impl PacketWrite for EntityStatus {}
 
-impl ProtocolWrite for EntityStatus {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x1C.into(), dst)?; // packet_id: 0x1C
-        i32::proto_encode(&value.entity_id, dst)?;
-        i8::proto_encode(&value.entity_status, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x21]
 pub struct KeepAlive {
     pub keep_alive_id: i64,
 }
-impl PacketWrite for KeepAlive {}
 
-impl ProtocolWrite for KeepAlive {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x21.into(), dst)?; // packet_id: 0x21
-        i64::proto_encode(&value.keep_alive_id, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PacketWrite)]
+// #[packet_id = 0x22]
 pub struct ChunkData {
     pub chunk_x: i32,
     pub chunk_z: i32,
@@ -216,8 +134,6 @@ pub struct ChunkData {
     pub data: Vec<u8>,
     pub block_entities: Vec<Nbt<BlockEntity>>,
 }
-
-impl PacketWrite for ChunkData {}
 
 impl ProtocolWrite for ChunkData {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
@@ -241,7 +157,8 @@ impl ProtocolWrite for ChunkData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x25]
 pub struct UpdateLight {
     pub chunk_x: Var<i32>,
     pub chunk_z: Var<i32>,
@@ -252,24 +169,9 @@ pub struct UpdateLight {
     pub sky_lights: Vec<u8>,
     pub block_lights: Vec<u8>,
 }
-impl PacketWrite for UpdateLight {}
 
-impl ProtocolWrite for UpdateLight {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x25.into(), dst)?; // packet_id: 0x25
-        <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
-        <Var<i32>>::proto_encode(&value.chunk_z, dst)?;
-        <Var<i32>>::proto_encode(&value.sky_light_mask, dst)?;
-        <Var<i32>>::proto_encode(&value.block_light_mask, dst)?;
-        <Var<i32>>::proto_encode(&value.empty_sky_light_mask, dst)?;
-        <Var<i32>>::proto_encode(&value.empty_block_light_mask, dst)?;
-        <Arr<Var<i32>, u8>>::proto_encode(&value.sky_lights, dst)?;
-        <Arr<Var<i32>, u8>>::proto_encode(&value.block_lights, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x26]
 pub struct JoinGame {
     pub entity_id: i32,
     pub game_mode: u8,
@@ -281,36 +183,11 @@ pub struct JoinGame {
     pub reduced_debug_info: bool,
     pub enable_respawn_screen: bool,
 }
-impl PacketWrite for JoinGame {}
 
-impl ProtocolWrite for JoinGame {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x26.into(), dst)?; // packet_id: 0x26
-        i32::proto_encode(&value.entity_id, dst)?;
-        u8::proto_encode(&value.game_mode, dst)?;
-        i32::proto_encode(&value.dimension, dst)?;
-        u64::proto_encode(&value.hashed_seed, dst)?;
-        u8::proto_encode(&value.max_players, dst)?;
-        String::proto_encode(&value.level_type, dst)?;
-        <Var<i32>>::proto_encode(&value.view_distance, dst)?;
-        bool::proto_encode(&value.reduced_debug_info, dst)?;
-        bool::proto_encode(&value.enable_respawn_screen, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x34]
 pub struct PlayerInfo {
     pub action: PlayerInfoAction,
-}
-impl PacketWrite for PlayerInfo {}
-
-impl ProtocolWrite for PlayerInfo {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x34.into(), dst)?; // packet_id: 0x34
-        PlayerInfoAction::proto_encode(&value.action, dst)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -409,7 +286,8 @@ impl ProtocolWrite for PlayerInfoAction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x36]
 pub struct PlayerPositionAndLook {
     pub x: f64,
     pub y: f64,
@@ -419,23 +297,9 @@ pub struct PlayerPositionAndLook {
     pub flags: u8,
     pub teleport_id: Var<i32>,
 }
-impl PacketWrite for PlayerPositionAndLook {}
 
-impl ProtocolWrite for PlayerPositionAndLook {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x36.into(), dst)?; // packet_id: 0x36
-        f64::proto_encode(&value.x, dst)?;
-        f64::proto_encode(&value.y, dst)?;
-        f64::proto_encode(&value.z, dst)?;
-        f32::proto_encode(&value.yaw, dst)?;
-        f32::proto_encode(&value.pitch, dst)?;
-        u8::proto_encode(&value.flags, dst)?;
-        <Var<i32>>::proto_encode(&value.teleport_id, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PacketWrite)]
+// #[packet_id = 0x37]
 pub struct UnlockRecipes {
     pub action: Var<i32>,
     pub crafting_recipe_book_open: bool,
@@ -445,7 +309,6 @@ pub struct UnlockRecipes {
     pub recipe_ids: Vec<Var<i32>>,
     pub additional_recipe_ids: Option<Vec<Var<i32>>>,
 }
-impl PacketWrite for UnlockRecipes {}
 
 impl ProtocolWrite for UnlockRecipes {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
@@ -465,18 +328,10 @@ impl ProtocolWrite for UnlockRecipes {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x3E]
 pub struct WorldBorder {
     pub action: WorldBorderAction,
-}
-impl PacketWrite for WorldBorder {}
-
-impl ProtocolWrite for WorldBorder {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x3E.into(), dst)?; // packet_id: 0x3E
-        WorldBorderAction::proto_encode(&value.action, dst)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -566,62 +421,29 @@ impl ProtocolWrite for WorldBorderAction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x40]
 pub struct HeldItemChange {
     pub slot: u8,
 }
-impl PacketWrite for HeldItemChange {}
 
-impl ProtocolWrite for HeldItemChange {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x40.into(), dst)?; // packet_id: 0x40
-        u8::proto_encode(&value.slot, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x41]
 pub struct UpdateViewPosition {
     pub chunk_x: Var<i32>,
     pub chunk_z: Var<i32>,
 }
-impl PacketWrite for UpdateViewPosition {}
 
-impl ProtocolWrite for UpdateViewPosition {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x41.into(), dst)?; // packet_id: 0x41
-        <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
-        <Var<i32>>::proto_encode(&value.chunk_z, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x4E]
 pub struct SpawnPosition {
     pub location: Position,
 }
-impl PacketWrite for SpawnPosition {}
 
-impl ProtocolWrite for SpawnPosition {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x4E.into(), dst)?; // packet_id: 0x4E
-        Position::proto_encode(&value.location, dst)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x5B]
 pub struct DeclareRecipes {
     pub recipes: Vec<Recipe>,
-}
-impl PacketWrite for DeclareRecipes {}
-
-impl ProtocolWrite for DeclareRecipes {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x5B.into(), dst)?; // packet_id: 0x5B
-        <Arr<Var<i32>, Recipe>>::proto_encode(&value.recipes, dst)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -638,24 +460,13 @@ impl ProtocolWrite for Recipe {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x5C]
 pub struct Tags {
     pub block_tags: Vec<Tag>,
     pub item_tags: Vec<Tag>,
     pub fluid_tags: Vec<Tag>,
     pub entity_tags: Vec<Tag>,
-}
-impl PacketWrite for Tags {}
-
-impl ProtocolWrite for Tags {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x5C.into(), dst)?; // packet_id: 0x5C
-        <Arr<Var<i32>, Tag>>::proto_encode(&value.block_tags, dst)?;
-        <Arr<Var<i32>, Tag>>::proto_encode(&value.item_tags, dst)?;
-        <Arr<Var<i32>, Tag>>::proto_encode(&value.fluid_tags, dst)?;
-        <Arr<Var<i32>, Tag>>::proto_encode(&value.entity_tags, dst)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
