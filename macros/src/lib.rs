@@ -5,14 +5,40 @@ use syn::{
     Type,
 };
 
-#[proc_macro_derive(PacketWrite)]
+#[proc_macro_derive(PacketWrite, attributes(packet_id))]
 pub fn derive_packet_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = input.ident;
 
+    let attribute = input
+        .attrs
+        .iter()
+        .filter(|a| a.path.segments.len() == 1 && a.path.segments[0].ident == "packet_id")
+        .nth(0)
+        .expect("Expected #[packet_id = id]");
+
+    let meta = attribute
+        .parse_meta()
+        .expect("Expected packet_id attribute");
+    let packet_id = match meta {
+        syn::Meta::NameValue(ref nv) => {
+            if let Lit::Int(ref n) = nv.lit {
+                n.base10_parse::<i32>().expect("Expected number id")
+            } else {
+                panic!("Expected 'packet_id = number'")
+            }
+        }
+        _ => panic!("Expected 'packet_id = number'"),
+    };
+
     let expanded = quote! {
-        impl PacketWrite for #name {}
+        impl PacketWrite for #name {
+            #[inline(always)]
+            fn packet_id() -> i32 {
+                #packet_id
+            }
+        }
     };
     proc_macro::TokenStream::from(expanded)
 }
@@ -63,35 +89,7 @@ pub fn derive_protocol_write(input: proc_macro::TokenStream) -> proc_macro::Toke
     let name = input.ident;
     let encodes = proto_encode_fields(&input.data);
 
-    let attribute = input
-        .attrs
-        .iter()
-        .filter(|a| a.path.segments.len() == 1 && a.path.segments[0].ident == "packet_id")
-        .nth(0)
-        .expect("Expected #[packet_id = id]");
-
-    let meta = attribute
-        .parse_meta()
-        .expect("Expected packet_id attribute");
-    let packet_id = match meta {
-        syn::Meta::NameValue(ref nv) => {
-            if let Lit::Int(ref n) = nv.lit {
-                n.base10_parse::<i32>().expect("Expected number id")
-            } else {
-                panic!("Expected 'packet_id = number'")
-            }
-        }
-        _ => panic!("Expected 'packet_id = number'"),
-    };
-
     let expanded = quote! {
-        impl #name {
-            #[inline(always)]
-            fn packet_id() -> i32 {
-                #packet_id
-            }
-        }
-
         impl ProtocolWrite for #name {
             fn proto_encode(value: &Self, dst: &mut dyn Write) -> std::io::Result<()> {
                 <Var<i32>>::proto_encode(&Self::packet_id().into(), dst)?;

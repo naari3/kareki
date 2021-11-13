@@ -123,7 +123,7 @@ pub struct KeepAlive {
 }
 
 #[derive(Debug, Clone, PacketWrite)]
-// #[packet_id = 0x22]
+#[packet_id = 0x22]
 pub struct ChunkData {
     pub chunk_x: i32,
     pub chunk_z: i32,
@@ -137,7 +137,6 @@ pub struct ChunkData {
 
 impl ProtocolWrite for ChunkData {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x22.into(), dst)?; // packet_id: 0x22
         i32::proto_encode(&value.chunk_x, dst)?;
         i32::proto_encode(&value.chunk_z, dst)?;
         bool::proto_encode(&value.full_chunk, dst)?;
@@ -299,7 +298,7 @@ pub struct PlayerPositionAndLook {
 }
 
 #[derive(Debug, Clone, PacketWrite)]
-// #[packet_id = 0x37]
+#[packet_id = 0x37]
 pub struct UnlockRecipes {
     pub action: Var<i32>,
     pub crafting_recipe_book_open: bool,
@@ -312,7 +311,6 @@ pub struct UnlockRecipes {
 
 impl ProtocolWrite for UnlockRecipes {
     fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
-        <Var<i32>>::proto_encode(&0x37.into(), dst)?; // packet_id: 0x37
         <Var<i32>>::proto_encode(&value.action, dst)?;
         bool::proto_encode(&value.crafting_recipe_book_open, dst)?;
         bool::proto_encode(&value.crafting_recipe_book_filter_active, dst)?;
