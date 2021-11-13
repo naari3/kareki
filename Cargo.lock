@@ -440,6 +440,7 @@ dependencies = [
  "bytes 1.1.0",
  "cfb8",
  "hematite-nbt",
+ "kareki-macros",
  "mojang-api",
  "num",
  "openssl",
@@ -448,6 +449,15 @@ dependencies = [
  "serde_json",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "kareki-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

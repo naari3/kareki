@@ -186,15 +186,15 @@ pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
     for x in 0..16 {
         for z in 0..16 {
             for y in 0..16 {
-                if !(14 > x && x >= 2 && 14 > z && z >= 2) {
-                    chunk.set_block(x, y + 90, z, 150 + (y / 2) as u16)?;
-                }
-                if !(14 > x && x >= 2 && 14 > z && z >= 2) {
-                    chunk.set_block(x, y + 68, z, 200 + (y / 2) as u16)?;
-                }
-                if !(12 > x && x >= 4 && 12 > z && z >= 4) {
-                    chunk.set_block(x, y + 48, z, 100 + (y / 2) as u16)?;
-                }
+                // if !(14 > x && x >= 2 && 14 > z && z >= 2) {
+                //     chunk.set_block(x, y + 90, z, 150 + (y / 2) as u16)?;
+                // }
+                // if !(14 > x && x >= 2 && 14 > z && z >= 2) {
+                //     chunk.set_block(x, y + 68, z, 200 + (y / 2) as u16)?;
+                // }
+                // if !(12 > x && x >= 4 && 12 > z && z >= 4) {
+                //     chunk.set_block(x, y + 48, z, 100 + (y / 2) as u16)?;
+                // }
                 if (x + y + z) / 4 % 3 != 0 {
                     chunk.set_block(x, y, z, (((x + y + z) % 8) + 1) as u16)?;
                 }
