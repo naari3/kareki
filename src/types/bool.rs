@@ -11,14 +11,14 @@ impl ProtocolLen for bool {
 }
 
 impl ProtocolWrite for bool {
-    fn proto_encode(value: &bool, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &bool, dst: &mut D) -> io::Result<()> {
         dst.write_u8(if *value { 1 } else { 0 })?;
         Ok(())
     }
 }
 
 impl ProtocolRead for bool {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<bool> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<bool> {
         let value = src.read_u8()?;
         if value > 1 {
             Err(io::Error::new(

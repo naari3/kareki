@@ -52,7 +52,7 @@ pub fn derive_protocol_read(input: proc_macro::TokenStream) -> proc_macro::Token
 
     let expanded = quote! {
         impl ProtocolRead for #name {
-            fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+            fn proto_decode<S: std::io::Read>(src: &mut S) -> std::io::Result<Self> {
                 Ok(Self {
                     #decodes
                 })
@@ -91,7 +91,7 @@ pub fn derive_protocol_write(input: proc_macro::TokenStream) -> proc_macro::Toke
 
     let expanded = quote! {
         impl ProtocolWrite for #name {
-            fn proto_encode(value: &Self, dst: &mut dyn Write) -> std::io::Result<()> {
+            fn proto_encode<D: std::io::Write>(value: &Self, dst: &mut D) -> std::io::Result<()> {
                 #encodes
 
                 Ok(())

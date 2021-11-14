@@ -16,7 +16,7 @@ impl From<i32> for Var<i32> {
 }
 
 trait ProtocolWrite<Clean = Self> {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> std::io::Result<()>;
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> std::io::Result<()>;
 }
 
 impl ProtocolWrite for u64 {

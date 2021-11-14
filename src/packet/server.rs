@@ -7,9 +7,9 @@ use crate::{
     types::{position::Position, Arr, Var},
 };
 
-fn read_packet_meta(stream: &mut dyn Read) -> std::io::Result<(u32, u32)> {
-    let packet_size = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
-    let packet_id = i32::from(<Var<i32>>::proto_decode(stream)?) as u32;
+fn read_packet_meta<S: Read>(src: &mut S) -> std::io::Result<(u32, u32)> {
+    let packet_size = i32::from(<Var<i32>>::proto_decode(src)?) as u32;
+    let packet_id = i32::from(<Var<i32>>::proto_decode(src)?) as u32;
     Ok((packet_size, packet_id))
 }
 
@@ -18,7 +18,7 @@ pub enum HandshakePacket {
 }
 
 impl ProtocolRead for HandshakePacket {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let (_packet_size, packet_id) = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => HandshakePacket::Handshake(Handshake::proto_decode(src)?),
@@ -47,7 +47,7 @@ pub enum NextState {
 }
 
 impl ProtocolRead for NextState {
-    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+    fn proto_decode<S: std::io::Read>(src: &mut S) -> std::io::Result<Self> {
         Ok(match <Var<i32>>::proto_decode(src)?.into() {
             1 => NextState::Status,
             2 => NextState::Login,
@@ -62,7 +62,7 @@ pub enum StatusPacket {
 }
 
 impl ProtocolRead for StatusPacket {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let (_packet_size, packet_id) = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => StatusPacket::Request(Request::proto_decode(src)?),
@@ -91,7 +91,7 @@ pub enum LoginPacket {
 }
 
 impl ProtocolRead for LoginPacket {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let (_packet_size, packet_id) = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => LoginPacket::LoginStart(LoginStart::proto_decode(src)?),
@@ -126,7 +126,7 @@ pub enum PlayPacket {
 }
 
 impl ProtocolRead for PlayPacket {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let (_packet_size, packet_id) = read_packet_meta(src)?;
         Ok(match packet_id {
             0x05 => PlayPacket::ClientSettings(ClientSettings::proto_decode(src)?),

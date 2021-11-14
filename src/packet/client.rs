@@ -98,7 +98,7 @@ pub struct Node {
 }
 
 impl ProtocolWrite for Node {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         u8::proto_encode(&value.flags, dst)?;
         <Arr<Var<i32>, Var<i32>>>::proto_encode(&value.children, dst)?;
         Option::proto_encode(&value.redirect_node, dst)?;
@@ -136,7 +136,7 @@ pub struct ChunkData {
 }
 
 impl ProtocolWrite for ChunkData {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         i32::proto_encode(&value.chunk_x, dst)?;
         i32::proto_encode(&value.chunk_z, dst)?;
         bool::proto_encode(&value.full_chunk, dst)?;
@@ -198,7 +198,7 @@ pub struct Properties {
 }
 
 impl ProtocolWrite for Properties {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         String::proto_encode(&value.name, dst)?;
         String::proto_encode(&value.value, dst)?;
         bool::proto_encode(&value.is_signed, dst)?;
@@ -219,7 +219,7 @@ pub struct AddPlayer {
 }
 
 impl ProtocolWrite for AddPlayer {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         Uuid::proto_encode(&value.uuid, dst)?;
         String::proto_encode(&value.name, dst)?;
         <Arr<Var<i32>, Properties>>::proto_encode(&value.props, dst)?;
@@ -232,7 +232,7 @@ impl ProtocolWrite for AddPlayer {
 }
 
 impl ProtocolWrite for (Uuid, Var<i32>) {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         Uuid::proto_encode(&value.0, dst)?;
         <Var<i32>>::proto_encode(&value.1, dst)?;
         Ok(())
@@ -240,7 +240,7 @@ impl ProtocolWrite for (Uuid, Var<i32>) {
 }
 
 impl ProtocolWrite for (Uuid, bool, Option<String>) {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         Uuid::proto_encode(&value.0, dst)?;
         bool::proto_encode(&value.1, dst)?;
         Option::proto_encode(&value.2, dst)?;
@@ -258,7 +258,7 @@ pub enum PlayerInfoAction {
 }
 
 impl ProtocolWrite for PlayerInfoAction {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         match value {
             PlayerInfoAction::AddPlayer(add_player) => {
                 <Var<i32>>::proto_encode(&0.into(), dst)?;
@@ -310,7 +310,7 @@ pub struct UnlockRecipes {
 }
 
 impl ProtocolWrite for UnlockRecipes {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         <Var<i32>>::proto_encode(&value.action, dst)?;
         bool::proto_encode(&value.crafting_recipe_book_open, dst)?;
         bool::proto_encode(&value.crafting_recipe_book_filter_active, dst)?;
@@ -365,7 +365,7 @@ pub enum WorldBorderAction {
 }
 
 impl ProtocolWrite for WorldBorderAction {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         match value {
             WorldBorderAction::SetSize { diameter } => {
                 <Var<i32>>::proto_encode(&0.into(), dst)?;
@@ -451,7 +451,7 @@ pub struct Recipe {
 }
 
 impl ProtocolWrite for Recipe {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         String::proto_encode(&value.recipe_type, dst)?;
         String::proto_encode(&value.recipe_id, dst)?;
         Ok(())
@@ -474,7 +474,7 @@ pub struct Tag {
 }
 
 impl ProtocolWrite for Tag {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         String::proto_encode(&value.name, dst)?;
         <Arr<Var<i32>, Var<i32>>>::proto_encode(&value.entries, dst)?;
         Ok(())

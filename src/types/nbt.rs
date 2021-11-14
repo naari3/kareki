@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use nbt;
 use serde::Serialize;
 
@@ -9,7 +11,7 @@ impl<T> ProtocolWrite for Nbt<T>
 where
     T: Serialize,
 {
-    fn proto_encode(value: &Self, dst: &mut dyn std::io::Write) -> std::io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> std::io::Result<()> {
         nbt::to_writer(dst, &value.0, None).unwrap();
         Ok(())
     }

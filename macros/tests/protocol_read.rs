@@ -9,11 +9,11 @@ pub struct Gogo {
 }
 
 trait ProtocolRead<Clean = Self> {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<Clean>;
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Clean>;
 }
 
 impl ProtocolRead for u64 {
-    fn proto_decode(src: &mut dyn Read) -> std::io::Result<u64> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<u64> {
         src.read_u64::<BigEndian>()
             .map_err(|err| std::io::Error::from(err))
     }

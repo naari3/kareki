@@ -10,14 +10,14 @@ pub mod server;
 use server::*;
 
 pub trait PacketRead: ProtocolRead + Sized {
-    fn packet_read(dst: &mut dyn Read) -> io::Result<Self> {
-        Self::proto_decode(dst)
+    fn packet_read<D: Read>(src: &mut D) -> io::Result<Self> {
+        Self::proto_decode(src)
     }
 }
 
 pub trait PacketWrite: ProtocolWrite + Sized {
     fn packet_id() -> i32;
-    fn packet_write(&self, dst: &mut dyn Write) -> io::Result<()> {
+    fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()> {
         let mut r = io::Cursor::new(vec![] as Vec<u8>);
 
         <Var<i32>>::proto_encode(&Self::packet_id().into(), &mut r)?;
@@ -28,18 +28,18 @@ pub trait PacketWrite: ProtocolWrite + Sized {
     }
 }
 
-pub fn read_handshake_packet(stream: &mut dyn Read) -> Result<HandshakePacket, Error> {
-    Ok(HandshakePacket::proto_decode(stream)?)
+pub fn read_handshake_packet<D: Read>(src: &mut D) -> Result<HandshakePacket, Error> {
+    Ok(HandshakePacket::proto_decode(src)?)
 }
 
-pub fn read_status_packet(stream: &mut dyn Read) -> Result<StatusPacket, Error> {
-    Ok(StatusPacket::proto_decode(stream)?)
+pub fn read_status_packet<D: Read>(src: &mut D) -> Result<StatusPacket, Error> {
+    Ok(StatusPacket::proto_decode(src)?)
 }
 
-pub fn read_login_packet(stream: &mut dyn Read) -> Result<LoginPacket, Error> {
-    Ok(LoginPacket::proto_decode(stream)?)
+pub fn read_login_packet<D: Read>(src: &mut D) -> Result<LoginPacket, Error> {
+    Ok(LoginPacket::proto_decode(src)?)
 }
 
-pub fn read_play_packet(stream: &mut dyn Read) -> Result<PlayPacket, Error> {
-    Ok(PlayPacket::proto_decode(stream)?)
+pub fn read_play_packet<D: Read>(src: &mut D) -> Result<PlayPacket, Error> {
+    Ok(PlayPacket::proto_decode(src)?)
 }

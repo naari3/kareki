@@ -54,7 +54,7 @@ impl ProtocolLen for Var<i32> {
 }
 
 impl ProtocolWrite for Var<i32> {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         let mut temp = value.0 as u32;
         loop {
             if (temp & !0x7fu32) == 0 {
@@ -69,7 +69,7 @@ impl ProtocolWrite for Var<i32> {
 }
 
 impl ProtocolRead for Var<i32> {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Self> {
         let mut x = 0i32;
 
         for shift in (0u32..32).step_by(7).into_iter() {
@@ -101,7 +101,7 @@ impl ProtocolLen for Var<i64> {
 }
 
 impl ProtocolWrite for Var<i64> {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         let mut temp = value.0 as u64;
         loop {
             if (temp & !0x7fu64) == 0 {
@@ -116,7 +116,7 @@ impl ProtocolWrite for Var<i64> {
 }
 
 impl ProtocolRead for Var<i64> {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Self> {
         let mut x = 0i64;
 
         for shift in (0u64..32).step_by(7).into_iter() {

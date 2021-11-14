@@ -12,7 +12,7 @@ impl ProtocolLen for Uuid {
 }
 
 impl ProtocolWrite for Uuid {
-    fn proto_encode(value: &Uuid, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Uuid, dst: &mut D) -> io::Result<()> {
         for b in value.as_bytes() {
             u8::proto_encode(b, dst)?;
         }
@@ -21,7 +21,7 @@ impl ProtocolWrite for Uuid {
 }
 
 impl ProtocolRead for Uuid {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Uuid> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Uuid> {
         let mut bytes = Vec::new();
         for _ in 0..16 {
             bytes.push(u8::proto_decode(src)?);

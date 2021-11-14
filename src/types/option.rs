@@ -18,7 +18,7 @@ impl<T> ProtocolWrite for Option<T>
 where
     T: ProtocolWrite,
 {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
         match value {
             Some(v) => T::proto_encode(v, dst)?,
             None => {}
@@ -32,7 +32,7 @@ impl<T> ProtocolRead for Option<T>
 where
     T: ProtocolRead,
 {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Self> {
         let value = T::proto_decode(src)?;
         Ok(Some(value))
     }

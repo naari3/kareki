@@ -1,4 +1,4 @@
-use std::io::{Result, Write};
+use std::io::{Read, Result, Write};
 
 use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 
@@ -15,7 +15,7 @@ impl ProtocolLen for Position {
 }
 
 impl ProtocolWrite for Position {
-    fn proto_encode(value: &Self, dst: &mut dyn Write) -> Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> Result<()> {
         u64::proto_encode(
             &((((value.x as u64) & 0x3FFFFFF) << 38)
                 | (((value.z as u64) & 0x3FFFFFF) << 12)
@@ -26,7 +26,7 @@ impl ProtocolWrite for Position {
 }
 
 impl ProtocolRead for Position {
-    fn proto_decode(src: &mut dyn std::io::Read) -> std::io::Result<Self> {
+    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let datum = u64::proto_decode(src)?;
         Ok(Self {
             x: (datum >> 38) as u32,

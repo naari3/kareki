@@ -23,7 +23,7 @@ impl<T: ProtocolLen> ProtocolLen<Vec<T>> for Arr<Var<i32>, T> {
 }
 
 impl<T: ProtocolWrite> ProtocolWrite<Vec<T>> for Arr<Var<i32>, T> {
-    fn proto_encode(value: &Vec<T>, dst: &mut dyn Write) -> io::Result<()> {
+    fn proto_encode<D: Write>(value: &Vec<T>, dst: &mut D) -> io::Result<()> {
         let len = (value.len() as i32).into();
         <Var<i32>>::proto_encode(&len, dst)?;
         for elt in value {
@@ -34,7 +34,7 @@ impl<T: ProtocolWrite> ProtocolWrite<Vec<T>> for Arr<Var<i32>, T> {
 }
 
 impl<T: ProtocolRead> ProtocolRead<Vec<T>> for Arr<Var<i32>, T> {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Vec<T>> {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Vec<T>> {
         let len = i32::from(<Var<i32>>::proto_decode(src)?)
             .to_usize()
             .ok_or(io::Error::new(

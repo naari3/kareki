@@ -3,11 +3,11 @@ use std::io;
 use std::io::{Read, Write};
 
 pub trait ProtocolRead<Clean = Self> {
-    fn proto_decode(src: &mut dyn Read) -> io::Result<Clean>;
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Clean>;
 }
 
 pub trait ProtocolWrite<Clean = Self> {
-    fn proto_encode(value: &Clean, dst: &mut dyn Write) -> io::Result<()>;
+    fn proto_encode<D: Write>(value: &Clean, dst: &mut D) -> io::Result<()>;
 }
 
 pub trait ProtocolLen<Clean = Self> {
@@ -22,13 +22,13 @@ macro_rules! impl_protocol {
             }
         }
         impl ProtocolWrite for $name {
-            fn proto_encode(value: &$name, dst: &mut dyn Write) -> io::Result<()> {
+            fn proto_encode<D: Write>(value: &$name, dst: &mut D) -> io::Result<()> {
                 dst.$enc_name(*value)?;
                 Ok(())
             }
         }
         impl ProtocolRead for $name {
-            fn proto_decode(src: &mut dyn Read) -> io::Result<$name> {
+            fn proto_decode<S: Read>(src: &mut S) -> io::Result<$name> {
                 src.$dec_name().map_err(|err| io::Error::from(err))
             }
         }
@@ -41,14 +41,14 @@ macro_rules! impl_protocol {
         }
 
         impl ProtocolWrite for $name {
-            fn proto_encode(value: &$name, dst: &mut dyn Write) -> io::Result<()> {
+            fn proto_encode<D: Write>(value: &$name, dst: &mut D) -> io::Result<()> {
                 dst.$enc_name::<BigEndian>(*value)?;
                 Ok(())
             }
         }
 
         impl ProtocolRead for $name {
-            fn proto_decode(src: &mut dyn Read) -> io::Result<$name> {
+            fn proto_decode<S: Read>(src: &mut S) -> io::Result<$name> {
                 src.$dec_name::<BigEndian>()
                     .map_err(|err| io::Error::from(err))
             }

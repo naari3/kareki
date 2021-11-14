@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Result;
+use std::io::Write;
 
 use crate::protocol::ProtocolWrite;
 
@@ -102,7 +103,7 @@ impl ChunkSection {
 }
 
 impl ProtocolWrite for ChunkSection {
-    fn proto_encode(value: &Self, dst: &mut dyn std::io::Write) -> std::io::Result<()> {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> std::io::Result<()> {
         let palette = value.make_palette();
         let (block_count, bits_per_block, palette, data) =
             Self::from_array_and_palette(&value.data, palette);
