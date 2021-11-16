@@ -28,18 +28,26 @@ pub trait PacketWrite: ProtocolWrite + Sized {
     }
 }
 
+pub trait PacketWriteEnum {
+    fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()>;
+}
+
+pub trait PacketReadEnum: Sized {
+    fn packet_read<S: std::io::Read>(src: &mut S) -> std::io::Result<Self>;
+}
+
 pub fn read_handshake_packet<D: Read>(src: &mut D) -> Result<HandshakePacket, Error> {
-    Ok(HandshakePacket::proto_decode(src)?)
+    Ok(HandshakePacket::packet_read(src)?)
 }
 
 pub fn read_status_packet<D: Read>(src: &mut D) -> Result<StatusPacket, Error> {
-    Ok(StatusPacket::proto_decode(src)?)
+    Ok(StatusPacket::packet_read(src)?)
 }
 
 pub fn read_login_packet<D: Read>(src: &mut D) -> Result<LoginPacket, Error> {
-    Ok(LoginPacket::proto_decode(src)?)
+    Ok(LoginPacket::packet_read(src)?)
 }
 
 pub fn read_play_packet<D: Read>(src: &mut D) -> Result<PlayPacket, Error> {
-    Ok(PlayPacket::proto_decode(src)?)
+    Ok(PlayPacket::packet_read(src)?)
 }

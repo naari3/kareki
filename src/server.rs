@@ -1,55 +1,97 @@
 use std::{
-    io::{self, Cursor, ErrorKind, Read, Result},
-    net::TcpListener,
-    sync::mpsc::{self, Receiver},
-    thread::{self, sleep},
+    io::{self, Cursor, ErrorKind, Result},
+    thread::sleep,
     time::{Duration, Instant},
 };
 
+use aes::Aes128;
+use cfb8::stream_cipher::NewStreamCipher;
+use cfb8::{stream_cipher::StreamCipher, Cfb8};
+use flume::Sender;
+use futures_lite::FutureExt;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpListener, TcpStream,
+    },
+    time::timeout,
+};
+
 use crate::protocol::ProtocolRead;
+use crate::{client::Client, packet::PacketWriteEnum, types::Var};
 use crate::{
     login,
-    mcstream::McStream,
     packet::{
-        read_login_packet, read_play_packet,
+        client,
         server::{LoginPacket, PlayPacket},
-        PacketWrite,
+        PacketReadEnum,
     },
     play,
     state::State,
-    types::Var,
     HandshakePacket,
 };
+
 use crate::{
-    packet::{
-        read_handshake_packet, read_status_packet,
-        server::{NextState, StatusPacket},
-    },
+    packet::server::{NextState, StatusPacket},
     slp::handle_slp_status,
 };
 use crate::{slp::handle_slp_ping, HandshakePacket::Handshake};
 
-pub struct Client {
-    stream: McStream,
-    state: State,
-    received_buf: Vec<u8>,
+pub type AesCfb8 = Cfb8<Aes128>;
+
+pub struct Worker {
+    reader: Reader,
+    writer: Writer,
+    pub state: State,
+    packets_to_send_tx: Sender<client::PlayPacket>,
+    received_packets_rx: flume::Receiver<PlayPacket>,
 }
 
-enum NextConnect {
+pub enum NextConnect {
     Disconnect,
     Join,
 }
 
-impl Client {
-    fn handshake(&mut self, handshake: HandshakePacket) -> Result<NextConnect> {
+impl Worker {
+    fn new(stream: TcpStream) -> Self {
+        let (reader, writer) = stream.into_split();
+        let (received_packets_tx, received_packets_rx) = flume::bounded(32);
+        let (packets_to_send_tx, packets_to_send_rx) = flume::unbounded();
+        let reader = Reader::new(reader, received_packets_tx);
+        let writer = Writer::new(writer, packets_to_send_rx);
+
+        Self {
+            reader,
+            writer,
+            state: State::default(),
+            packets_to_send_tx,
+            received_packets_rx,
+        }
+    }
+
+    fn run(self) {
+        let Self { reader, writer, .. } = self;
+        let reader = tokio::task::spawn(async move { reader.run().await });
+        let writer = tokio::task::spawn(async move { writer.run().await });
+
+        tokio::task::spawn(async move {
+            let result = reader.race(writer).await.expect("task panicked");
+            if let Err(_e) = result {
+                // disconnect
+            }
+        });
+    }
+
+    async fn handshake(&mut self, handshake: HandshakePacket) -> Result<NextConnect> {
         let next = match handshake {
             Handshake(h) => match h.next_state {
                 NextState::Status => {
-                    handle_status_handshake(&mut self.stream)?;
+                    handle_status_handshake(self).await?;
                     NextConnect::Disconnect
                 }
                 NextState::Login => {
-                    handle_login_handshake(&mut self.stream, &mut self.state)?;
+                    handle_login_handshake(self).await?;
                     println!("gogo");
 
                     NextConnect::Join
@@ -59,89 +101,50 @@ impl Client {
         Ok(next)
     }
 
-    fn update_play(&mut self) -> Result<()> {
-        match read_play_packet(&mut self.stream) {
-            Ok(play_packet) => match play_packet {
-                PlayPacket::ClientSettings(client_settings) => {
-                    println!("client settings: {:?}", client_settings);
-                }
-                PlayPacket::KeepAlive(keep_alive) => {
-                    println!("keep alive: {:?}", keep_alive);
-                }
-                PlayPacket::PlayerPosition(player_position) => {
-                    println!("player position: {:?}", player_position);
-                }
-                PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
-                    println!(
-                        "player position and rotation: {:?}",
-                        player_position_and_rotation
-                    );
-                }
-                PlayPacket::PlayerBlockPlacement(placement) => {
-                    println!("placement: {:?}", placement);
-                }
-            },
-            Err(_) => {}
-        }
-        if self.state.last_keep_alive.elapsed().as_secs() > 10 {
-            self.state.last_keep_alive = Instant::now();
-            play::keep_alive(self)?;
-        }
+    pub async fn write_packet<P: PacketWriteEnum>(&mut self, packet: P) -> Result<()> {
+        self.writer.write(packet).await?;
         Ok(())
     }
 
-    pub fn write_packet<P>(&mut self, packet: P) -> Result<()>
-    where
-        P: PacketWrite,
-    {
-        packet.packet_write(&mut self.stream)?;
-        Ok(())
+    pub async fn read_packet_exact<P: PacketReadEnum>(&mut self) -> Result<P> {
+        let packet = self.reader.read::<P>().await?;
+        Ok(packet)
     }
 
-    pub fn read_packet_bytes<S>(&mut self, stream: &mut S) -> Result<Vec<u8>>
-    where
-        S: Read,
-    {
-        loop {
-            if self.received_buf.len() > 0 {
-                let mut cursor = Cursor::new(&self.received_buf[..]);
-                let len: i32 = <Var<i32>>::proto_decode(&mut cursor)?.into();
-                let mut data = Vec::with_capacity(len as usize);
-                stream.read_exact(&mut data)?;
-                return Ok(data);
-            }
+    pub fn set_key(&mut self, key: &[u8]) {
+        self.reader
+            .set_decryptor(AesCfb8::new_var(&key, &key).unwrap());
+        self.writer
+            .set_encryptor(AesCfb8::new_var(&key, &key).unwrap());
+    }
 
-            let len = stream.read(&mut self.received_buf)?;
-            if len == 0 {
-                return Err(io::Error::new(ErrorKind::UnexpectedEof, "read 0 bytes").into());
-            }
-        }
+    pub fn packets_to_send(&self) -> Sender<client::PlayPacket> {
+        self.packets_to_send_tx.clone()
+    }
+
+    pub fn received_packets(&self) -> flume::Receiver<PlayPacket> {
+        self.received_packets_rx.clone()
     }
 }
 
 pub struct Server {
     clients: Vec<Client>,
-    receiver: Receiver<Client>,
+    receiver: flume::Receiver<Client>,
 }
 
 impl Server {
-    pub fn listen(bind_address: &str, sender: mpsc::Sender<Client>) {
-        let listener = TcpListener::bind(bind_address).expect("Error. failed to bind.");
-        for streams in listener.incoming() {
-            match streams {
-                Err(e) => eprintln!("error: {}", e),
-                Ok(tcp_stream) => {
-                    println!("connection from {:?}", tcp_stream.peer_addr());
-                    let mut stream = McStream::new(tcp_stream);
-                    let state = State::default();
+    pub async fn listen(bind_address: &str, sender: Sender<Client>) {
+        let mut listener = TcpListener::bind(bind_address)
+            .await
+            .expect("Error. failed to bind.");
+        tokio::task::spawn(async move {
+            loop {
+                if let Ok((stream, addr)) = listener.accept().await {
+                    println!("connection from {:?}", addr);
 
-                    let handshake = read_handshake_packet(&mut stream).unwrap();
-                    let mut client = Client {
-                        stream,
-                        state,
-                        received_buf: Vec::with_capacity(1000000),
-                    };
-                    let next = match client.handshake(handshake) {
+                    let mut worker = Worker::new(stream);
+                    let handshake = worker.read_packet_exact::<HandshakePacket>().await.unwrap();
+                    let next = match worker.handshake(handshake).await {
                         Ok(next) => next,
                         Err(err) => {
                             println!("{:?}", err);
@@ -151,18 +154,26 @@ impl Server {
 
                     match next {
                         NextConnect::Disconnect => continue,
-                        NextConnect::Join => sender.send(client).unwrap(),
+                        NextConnect::Join => {
+                            let state = worker.state.clone();
+                            let client = Client::new(
+                                worker.packets_to_send(),
+                                worker.received_packets(),
+                                state,
+                            );
+                            sender.send_async(client).await.unwrap();
+                            worker.run()
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
-    pub fn new(bind_string: String) -> Self {
-        let (sender, receiver) = mpsc::channel();
-        thread::spawn(move || {
-            Self::listen(&bind_string, sender);
-        });
+    pub async fn new(bind_string: String) -> Self {
+        let (sender, receiver) = flume::bounded(4);
+        Self::listen(&bind_string, sender).await;
+
         Self {
             clients: Vec::new(),
             receiver,
@@ -183,9 +194,9 @@ impl Server {
     fn update(&mut self) -> Result<()> {
         loop {
             match self.receiver.try_recv() {
-                Ok(stream) => self.clients.push(stream),
-                Err(mpsc::TryRecvError::Empty) => break,
-                Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
+                Ok(worker) => self.clients.push(worker),
+                Err(flume::TryRecvError::Empty) => break,
+                Err(flume::TryRecvError::Disconnected) => return Ok(()),
             }
         }
         let mut will_remove = vec![];
@@ -197,7 +208,9 @@ impl Server {
                         ErrorKind::BrokenPipe => {
                             will_remove.push(index);
                         }
-                        _ => {}
+                        _ => {
+                            will_remove.push(index);
+                        }
                     }
                     println!("err: {:?}", err);
                 }
@@ -211,47 +224,160 @@ impl Server {
     }
 }
 
-pub fn handle_status_handshake(stream: &mut McStream) -> Result<()> {
-    if let StatusPacket::Request(request) = read_status_packet(stream)? {
-        handle_slp_status(stream, request)?;
+pub struct Reader {
+    stream: OwnedReadHalf,
+    buffer: Vec<u8>,
+    received_packets: Sender<PlayPacket>,
+    decryptor: Option<AesCfb8>,
+}
+
+impl Reader {
+    pub fn new(stream: OwnedReadHalf, received_packets: Sender<PlayPacket>) -> Self {
+        Self {
+            stream,
+            buffer: vec![],
+            received_packets,
+            decryptor: None,
+        }
+    }
+
+    pub async fn run(mut self) -> Result<()> {
+        loop {
+            let packet = self.read::<PlayPacket>().await?;
+            println!("receive packet: {:?}", packet);
+            let result = self.received_packets.send_async(packet).await;
+            if result.is_err() {
+                return Ok(());
+            }
+        }
+    }
+
+    pub async fn read<P: PacketReadEnum>(&mut self) -> Result<P> {
+        loop {
+            let mut cursor = Cursor::new(&self.buffer[..]);
+            match <Var<i32>>::proto_decode(&mut cursor) {
+                Ok(length) => {
+                    let length: i32 = length.into();
+                    let length = length as usize;
+                    if self.buffer.len() >= length {
+                        let mut buf2 = vec![0; length];
+                        std::io::Read::read_exact(&mut cursor, &mut buf2[..])?;
+                        let mut buf2_cur = Cursor::new(buf2);
+
+                        let next_cursor = cursor.position() as usize;
+                        self.buffer = self.buffer.split_off(next_cursor);
+
+                        if let Ok(packet) = P::packet_read(&mut buf2_cur) {
+                            return Ok(packet);
+                        }
+                    }
+                }
+                Err(_) => {}
+            }
+
+            let duration = Duration::from_secs(10);
+            let mut buf = vec![0; 512];
+            let read_bytes = timeout(duration, self.stream.read(&mut buf)).await??;
+            if read_bytes == 0 {
+                return Err(io::Error::new(ErrorKind::UnexpectedEof, "read 0 bytes").into());
+            }
+
+            let bytes = &mut buf[..read_bytes];
+            if let Some(decryptor) = self.decryptor.as_mut() {
+                decryptor.decrypt(bytes);
+            }
+            self.buffer.extend(bytes.as_ref());
+        }
+    }
+
+    pub fn set_decryptor(&mut self, decryptor: AesCfb8) {
+        self.decryptor = Some(decryptor);
+    }
+}
+
+pub struct Writer {
+    stream: OwnedWriteHalf,
+    packets_to_send: flume::Receiver<client::PlayPacket>,
+    encryptor: Option<AesCfb8>,
+}
+
+impl Writer {
+    pub fn new(
+        stream: OwnedWriteHalf,
+        packets_to_send: flume::Receiver<client::PlayPacket>,
+    ) -> Self {
+        Self {
+            stream,
+            packets_to_send,
+            encryptor: None,
+        }
+    }
+
+    pub async fn run(mut self) -> Result<()> {
+        while let Ok(packet) = self.packets_to_send.recv_async().await {
+            self.write(packet).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn write<P: PacketWriteEnum>(&mut self, packet: P) -> Result<()> {
+        let mut dst = Vec::new();
+        packet.packet_write(&mut dst)?;
+        if let Some(encryptor) = self.encryptor.as_mut() {
+            encryptor.encrypt(&mut dst);
+        }
+        self.stream.write_all(&dst).await?;
+        Ok(())
+    }
+
+    pub fn set_encryptor(&mut self, encryptor: AesCfb8) {
+        self.encryptor = Some(encryptor);
+    }
+}
+
+pub async fn handle_status_handshake(worker: &mut Worker) -> Result<()> {
+    if let StatusPacket::Request(request) = worker.read_packet_exact::<StatusPacket>().await? {
+        handle_slp_status(worker, request).await?;
     };
-    if let StatusPacket::Ping(ping) = read_status_packet(stream)? {
-        handle_slp_ping(stream, ping)?;
+    if let StatusPacket::Ping(ping) = worker.read_packet_exact::<StatusPacket>().await? {
+        handle_slp_ping(worker, ping).await?;
     };
     Ok(())
 }
 
-pub fn handle_login_handshake(stream: &mut McStream, state: &mut State) -> Result<()> {
-    if let LoginPacket::LoginStart(start) = read_login_packet(stream)? {
+pub async fn handle_login_handshake(worker: &mut Worker) -> Result<()> {
+    if let LoginPacket::LoginStart(start) = worker.read_packet_exact().await? {
         let crack = false;
         if crack {
-            login::crack_login_start(stream, state, start)?;
+            login::crack_login_start(worker, start).await?;
         } else {
-            login::login_start(stream, state, start)?;
+            login::login_start(worker, start).await?;
         }
     }
-    if !state.crack {
-        if let LoginPacket::EncryptionResponse(encryption_response) = read_login_packet(stream)? {
-            login::encryption_response(stream, state, encryption_response)?;
+    if !worker.state.crack {
+        if let LoginPacket::EncryptionResponse(encryption_response) =
+            worker.read_packet_exact().await?
+        {
+            login::encryption_response(worker, encryption_response).await?;
         }
     }
 
-    play::join_game(stream)?;
-    play::client_settings(stream)?;
-    play::held_item_change(stream)?;
-    play::declare_recipes(stream)?;
-    play::tags(stream)?;
-    play::entity_status(stream)?;
+    play::join_game(worker).await?;
+    play::client_settings(worker).await?;
+    play::held_item_change(worker).await?;
+    play::declare_recipes(worker).await?;
+    play::tags(worker).await?;
+    play::entity_status(worker).await?;
     // play::decrale_commands(&mut stream)?;
-    play::unlock_recipes(stream)?;
-    play::play_position_and_look(stream)?;
-    play::player_info(stream, state)?;
-    play::update_view_position(stream)?;
-    play::update_light(stream)?;
-    play::chunk_data(stream)?;
-    play::world_border(stream)?;
-    play::spawn_position(stream)?;
-    play::play_position_and_look(stream)?;
+    play::unlock_recipes(worker).await?;
+    play::play_position_and_look(worker).await?;
+    play::player_info(worker).await?;
+    play::update_view_position(worker).await?;
+    play::update_light(worker).await?;
+    play::chunk_data(worker).await?;
+    play::world_border(worker).await?;
+    play::spawn_position(worker).await?;
+    play::play_position_and_look(worker).await?;
 
     Ok(())
 }

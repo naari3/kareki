@@ -10,10 +10,20 @@ use crate::{
     },
 };
 
-use super::PacketWrite;
-pub enum _StatusPacket {
+use super::{PacketWrite, PacketWriteEnum};
+
+#[derive(Debug, Clone)]
+pub enum StatusPacket {
     SlpResponse(SlpResponse),
     Pong(Pong),
+}
+impl PacketWriteEnum for StatusPacket {
+    fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()> {
+        match self {
+            StatusPacket::SlpResponse(packet) => packet.packet_write(dst),
+            StatusPacket::Pong(packet) => packet.packet_write(dst),
+        }
+    }
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
@@ -28,10 +38,22 @@ pub struct Pong {
     pub payload: u64,
 }
 
-pub enum _Login {
+#[derive(Debug, Clone)]
+pub enum LoginPacket {
     Disconnect(Disconnect),
     EncryptionRequest(EncryptionRequest),
     LoginSuccess(LoginSuccess),
+    SetCompression(SetCompression),
+}
+impl PacketWriteEnum for LoginPacket {
+    fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()> {
+        match self {
+            LoginPacket::Disconnect(packet) => packet.packet_write(dst),
+            LoginPacket::EncryptionRequest(packet) => packet.packet_write(dst),
+            LoginPacket::LoginSuccess(packet) => packet.packet_write(dst),
+            LoginPacket::SetCompression(packet) => packet.packet_write(dst),
+        }
+    }
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
@@ -61,7 +83,7 @@ pub struct SetCompression {
     pub thresshold: Var<i32>,
 }
 
-pub enum _Play {
+pub enum PlayPacket {
     DeclareCommands(DeclareCommands),             // 0x12
     EntityStatus(EntityStatus),                   // 0x1C
     KeepAlive(KeepAlive),                         // 0x21
@@ -77,6 +99,27 @@ pub enum _Play {
     SpawnPosition(SpawnPosition),                 // 0x4E
     DeclareRecipes(DeclareRecipes),               // 0x5B
     Tags(Tags),                                   // 0x5C
+}
+impl PacketWriteEnum for PlayPacket {
+    fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()> {
+        match self {
+            PlayPacket::DeclareCommands(packet) => packet.packet_write(dst),
+            PlayPacket::EntityStatus(packet) => packet.packet_write(dst),
+            PlayPacket::KeepAlive(packet) => packet.packet_write(dst),
+            PlayPacket::ChunkData(packet) => packet.packet_write(dst),
+            PlayPacket::UpdateLight(packet) => packet.packet_write(dst),
+            PlayPacket::JoinGame(packet) => packet.packet_write(dst),
+            PlayPacket::PlayerInfo(packet) => packet.packet_write(dst),
+            PlayPacket::PlayerPositionAndLook(packet) => packet.packet_write(dst),
+            PlayPacket::UnlockRecipes(packet) => packet.packet_write(dst),
+            PlayPacket::WorldBorder(packet) => packet.packet_write(dst),
+            PlayPacket::HeldItemChange(packet) => packet.packet_write(dst),
+            PlayPacket::UpdateViewPosition(packet) => packet.packet_write(dst),
+            PlayPacket::SpawnPosition(packet) => packet.packet_write(dst),
+            PlayPacket::DeclareRecipes(packet) => packet.packet_write(dst),
+            PlayPacket::Tags(packet) => packet.packet_write(dst),
+        }
+    }
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]

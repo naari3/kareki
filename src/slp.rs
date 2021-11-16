@@ -1,13 +1,11 @@
-use std::io::{Error, Read, Write};
+use std::io::Error;
 
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
-use crate::packet::client::{Pong, SlpResponse};
-use crate::packet::server::{Ping, Request, StatusPacket};
-use crate::packet::{read_status_packet, PacketWrite};
-
-use super::mcstream::McStream;
+use crate::packet::client::{self, Pong, SlpResponse};
+use crate::packet::server::{Ping, Request};
+use crate::server::Worker;
 
 #[derive(Debug, Serialize)]
 pub struct Description {
@@ -57,10 +55,7 @@ impl Serialize for StatusResponse {
     }
 }
 
-pub fn handle_slp_status<T>(stream: &mut T, _request: Request) -> Result<(), Error>
-where
-    T: Read + Write,
-{
+pub async fn handle_slp_status(worker: &mut Worker, _request: Request) -> Result<(), Error> {
     println!("get status request");
 
     let status_response = StatusResponse {
@@ -83,20 +78,20 @@ where
 
     println!("will send: {}", json_response);
 
-    let slp_response = SlpResponse { json_response };
-    slp_response.packet_write(stream)?;
+    let slp_response = client::StatusPacket::SlpResponse(SlpResponse { json_response });
+    worker.write_packet(slp_response).await?;
 
     println!("sent status");
     Ok(())
 }
 
-pub fn handle_slp_ping(stream: &mut McStream, ping: Ping) -> Result<(), Error> {
+pub async fn handle_slp_ping(worker: &mut Worker, ping: Ping) -> Result<(), Error> {
     println!("get ping");
 
-    let pong = Pong {
+    let pong = client::StatusPacket::Pong(Pong {
         payload: ping.payload,
-    };
-    pong.packet_write(stream)?;
+    });
+    worker.write_packet(pong).await?;
 
     println!("sent pong");
     Ok(())

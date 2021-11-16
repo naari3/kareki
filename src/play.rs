@@ -1,25 +1,21 @@
-use std::io::{self, Error};
-use std::time::SystemTime;
+use std::io::{self, Result};
 
-use super::mcstream::McStream;
 use crate::packet::client::{
     AddPlayer, ChunkData, DeclareCommands, DeclareRecipes, EntityStatus, HeldItemChange, JoinGame,
-    KeepAlive, PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags,
+    PlayPacket, PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags,
     UnlockRecipes, UpdateLight, UpdateViewPosition, WorldBorder, WorldBorderAction,
 };
-use crate::packet::PacketWrite;
-use crate::packet::{read_play_packet, server::PlayPacket};
+use crate::packet::server;
 use crate::protocol::ProtocolWrite;
-use crate::server::Client;
-use crate::state::State;
+use crate::server::Worker;
 use crate::types::chunk::Chunk;
 use crate::types::chunk_section::ChunkSection;
 use crate::types::heightmap::Heightmaps;
 use crate::types::nbt::Nbt;
 use crate::types::position::Position;
 
-pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
-    let join_game = JoinGame {
+pub async fn join_game(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::JoinGame(JoinGame {
         entity_id: 0,
         game_mode: 1,
         dimension: 0,
@@ -29,16 +25,16 @@ pub fn join_game(stream: &mut McStream) -> Result<(), Error> {
         view_distance: 4.into(),
         reduced_debug_info: false,
         enable_respawn_screen: true,
-    };
+    });
 
-    join_game.packet_write(stream)?;
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn client_settings(stream: &mut McStream) -> Result<(), Error> {
-    match read_play_packet(stream)? {
-        PlayPacket::ClientSettings(client_settings) => {
+pub async fn client_settings(worker: &mut Worker) -> Result<()> {
+    match worker.read_packet_exact().await? {
+        server::PlayPacket::ClientSettings(client_settings) => {
             println!(
                 "locale: {}, view_distance: {}, chat_mode: {}, chat_colors: {}, displayed_skin_parts: {}, main_hand: {}",
                 client_settings.locale, client_settings.view_distance, client_settings.chat_mode, client_settings.chat_colors, client_settings.displayed_skin_parts, client_settings.main_hand
@@ -55,54 +51,54 @@ pub fn client_settings(stream: &mut McStream) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn held_item_change(stream: &mut McStream) -> Result<(), Error> {
-    let held_item_change = HeldItemChange { slot: 0 };
-    held_item_change.packet_write(stream)?;
+pub async fn held_item_change(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::HeldItemChange(HeldItemChange { slot: 0 });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn declare_recipes(stream: &mut McStream) -> Result<(), Error> {
-    let declare_recipes = DeclareRecipes { recipes: vec![] };
-    declare_recipes.packet_write(stream)?;
+pub async fn declare_recipes(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::DeclareRecipes(DeclareRecipes { recipes: vec![] });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn tags(stream: &mut McStream) -> Result<(), Error> {
-    let tags = Tags {
+pub async fn tags(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::Tags(Tags {
         block_tags: vec![],
         item_tags: vec![],
         fluid_tags: vec![],
         entity_tags: vec![],
-    };
-    tags.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn entity_status(stream: &mut McStream) -> Result<(), Error> {
-    let entity_status = EntityStatus {
+pub async fn entity_status(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::EntityStatus(EntityStatus {
         entity_id: 0,
         entity_status: 2,
-    };
-    entity_status.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn declare_commands(stream: &mut McStream) -> Result<(), Error> {
-    let declare_commands = DeclareCommands {
+pub async fn declare_commands(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::DeclareCommands(DeclareCommands {
         nodes: vec![],
         root_index: 0.into(),
-    };
-    declare_commands.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn unlock_recipes(stream: &mut McStream) -> Result<(), Error> {
-    let unlock_recipes = UnlockRecipes {
+pub async fn unlock_recipes(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::UnlockRecipes(UnlockRecipes {
         action: 0.into(),
         crafting_recipe_book_open: true,
         crafting_recipe_book_filter_active: false,
@@ -110,14 +106,14 @@ pub fn unlock_recipes(stream: &mut McStream) -> Result<(), Error> {
         smelting_recipe_book_filter_active: false,
         recipe_ids: vec![],
         additional_recipe_ids: Some(vec![]),
-    };
-    unlock_recipes.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn play_position_and_look(stream: &mut McStream) -> Result<(), Error> {
-    let play_position_and_look = PlayerPositionAndLook {
+pub async fn play_position_and_look(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::PlayerPositionAndLook(PlayerPositionAndLook {
         x: 0.0,
         y: 64.0,
         z: 0.0,
@@ -125,17 +121,17 @@ pub fn play_position_and_look(stream: &mut McStream) -> Result<(), Error> {
         pitch: 0.0,
         flags: 0,
         teleport_id: 0.into(),
-    };
-    play_position_and_look.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn player_info(stream: &mut McStream, state: &mut State) -> Result<(), Error> {
-    let player_info = PlayerInfo {
+pub async fn player_info(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::PlayerInfo(PlayerInfo {
         action: PlayerInfoAction::AddPlayer(vec![AddPlayer {
-            uuid: state.uuid.as_ref().unwrap().clone(),
-            name: state.name.as_ref().unwrap().to_string(),
+            uuid: worker.state.uuid.as_ref().unwrap().clone(),
+            name: worker.state.name.as_ref().unwrap().to_string(),
             props: vec![
                 // Properties {
                 //     name: "test".to_owned(),
@@ -149,24 +145,24 @@ pub fn player_info(stream: &mut McStream, state: &mut State) -> Result<(), Error
             has_display_name: false,
             display_name: None,
         }]),
-    };
-    player_info.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn update_view_position(stream: &mut McStream) -> Result<(), Error> {
-    let update_view_position = UpdateViewPosition {
+pub async fn update_view_position(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::UpdateViewPosition(UpdateViewPosition {
         chunk_x: 0.into(),
         chunk_z: 1.into(),
-    };
-    update_view_position.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
-    let update_light = UpdateLight {
+pub async fn update_light(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::UpdateLight(UpdateLight {
         chunk_x: 0.into(),
         chunk_z: 0.into(),
         sky_light_mask: 3.into(),
@@ -175,13 +171,13 @@ pub fn update_light(stream: &mut McStream) -> Result<(), Error> {
         empty_block_light_mask: 0.into(),
         sky_lights: vec![127; 2048],
         block_lights: vec![127; 2048],
-    };
-    update_light.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
+pub async fn chunk_data(worker: &mut Worker) -> Result<()> {
     let mut chunk = Chunk::empty();
     for x in 0..16 {
         for z in 0..16 {
@@ -208,7 +204,7 @@ pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
                 ChunkSection::proto_encode(section, &mut data)?;
             }
 
-            let chunk_data = ChunkData {
+            let packet = PlayPacket::ChunkData(ChunkData {
                 chunk_x: x,
                 chunk_z: z,
                 full_chunk: true,
@@ -217,40 +213,28 @@ pub fn chunk_data(stream: &mut McStream) -> Result<(), Error> {
                 biomes: Some(vec![0.into(); 1024]),
                 data,
                 block_entities: vec![],
-            };
-            chunk_data.packet_write(stream)?;
+            });
+            worker.write_packet(packet).await?;
         }
     }
 
     Ok(())
 }
 
-pub fn world_border(stream: &mut McStream) -> Result<(), Error> {
-    let world_border = WorldBorder {
+pub async fn world_border(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::WorldBorder(WorldBorder {
         action: WorldBorderAction::SetSize { diameter: 128.0 },
-    };
-    world_border.packet_write(stream)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }
 
-pub fn spawn_position(stream: &mut McStream) -> Result<(), Error> {
-    let spawn_position = SpawnPosition {
+pub async fn spawn_position(worker: &mut Worker) -> Result<()> {
+    let packet = PlayPacket::SpawnPosition(SpawnPosition {
         location: Position { x: 0, y: 64, z: 0 },
-    };
-    spawn_position.packet_write(stream)?;
-
-    Ok(())
-}
-
-pub fn keep_alive(client: &mut Client) -> Result<(), Error> {
-    let packet = KeepAlive {
-        keep_alive_id: SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64,
-    };
-    client.write_packet(packet)?;
+    });
+    worker.write_packet(packet).await?;
 
     Ok(())
 }

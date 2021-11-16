@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, Cursor, Read};
 
 use kareki_macros::ProtocolRead;
 
@@ -7,19 +7,20 @@ use crate::{
     types::{position::Position, Arr, Var},
 };
 
-fn read_packet_meta<S: Read>(src: &mut S) -> std::io::Result<(u32, u32)> {
-    let packet_size = i32::from(<Var<i32>>::proto_decode(src)?) as u32;
+use super::PacketReadEnum;
+
+fn read_packet_meta<S: Read>(src: &mut S) -> std::io::Result<u32> {
     let packet_id = i32::from(<Var<i32>>::proto_decode(src)?) as u32;
-    Ok((packet_size, packet_id))
+    Ok(packet_id)
 }
 
 pub enum HandshakePacket {
     Handshake(Handshake),
 }
 
-impl ProtocolRead for HandshakePacket {
-    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
-        let (_packet_size, packet_id) = read_packet_meta(src)?;
+impl PacketReadEnum for HandshakePacket {
+    fn packet_read<S: Read>(src: &mut S) -> std::io::Result<Self> {
+        let packet_id = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => HandshakePacket::Handshake(Handshake::proto_decode(src)?),
             _ => {
@@ -61,9 +62,9 @@ pub enum StatusPacket {
     Ping(Ping),
 }
 
-impl ProtocolRead for StatusPacket {
-    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
-        let (_packet_size, packet_id) = read_packet_meta(src)?;
+impl PacketReadEnum for StatusPacket {
+    fn packet_read<S: Read>(src: &mut S) -> std::io::Result<Self> {
+        let packet_id = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => StatusPacket::Request(Request::proto_decode(src)?),
             1 => StatusPacket::Ping(Ping::proto_decode(src)?),
@@ -90,9 +91,9 @@ pub enum LoginPacket {
     EncryptionResponse(EncryptionResponse),
 }
 
-impl ProtocolRead for LoginPacket {
-    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
-        let (_packet_size, packet_id) = read_packet_meta(src)?;
+impl PacketReadEnum for LoginPacket {
+    fn packet_read<S: Read>(src: &mut S) -> std::io::Result<Self> {
+        let packet_id = read_packet_meta(src)?;
         Ok(match packet_id {
             0 => LoginPacket::LoginStart(LoginStart::proto_decode(src)?),
             1 => LoginPacket::EncryptionResponse(EncryptionResponse::proto_decode(src)?),
@@ -117,6 +118,7 @@ pub struct EncryptionResponse {
     pub verify_token: Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
 pub enum PlayPacket {
     /* 0x05 */ ClientSettings(ClientSettings),
     /* 0x0F */ KeepAlive(KeepAlive),
@@ -125,9 +127,9 @@ pub enum PlayPacket {
     /* 0x2C */ PlayerBlockPlacement(PlayerBlockPlacement),
 }
 
-impl ProtocolRead for PlayPacket {
-    fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
-        let (_packet_size, packet_id) = read_packet_meta(src)?;
+impl PacketReadEnum for PlayPacket {
+    fn packet_read<S: Read>(src: &mut S) -> std::io::Result<Self> {
+        let packet_id = read_packet_meta(src)?;
         Ok(match packet_id {
             0x05 => PlayPacket::ClientSettings(ClientSettings::proto_decode(src)?),
             0x0F => PlayPacket::KeepAlive(KeepAlive::proto_decode(src)?),
@@ -135,11 +137,10 @@ impl ProtocolRead for PlayPacket {
             0x12 => {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
             }
-            0x2C => PlayPacket::PlayerBlockPlacement(PlayerBlockPlacement::proto_decode(src)?),
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "invalid PlayPacket",
+                    "Unsupported PlayPacket",
                 ))
             }
         })

@@ -3,8 +3,8 @@ use std::time::Instant;
 use openssl::{pkey::Private, rsa::Rsa};
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct State {
-    pub mode: Mode,
     pub name: Option<String>,
     pub rsa: Option<Rsa<Private>>,
     pub uuid: Option<Uuid>,
@@ -15,7 +15,6 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            mode: Mode::Handshake,
             name: Default::default(),
             rsa: Default::default(),
             uuid: Default::default(),
@@ -23,12 +22,4 @@ impl Default for State {
             last_keep_alive: Instant::now(),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Mode {
-    Handshake,
-    Status,
-    Login,
-    Play,
 }
