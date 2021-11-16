@@ -9,6 +9,7 @@ pub struct State {
     pub rsa: Option<Rsa<Private>>,
     pub uuid: Option<Uuid>,
     pub crack: bool,
+    pub coordinate: Coordinate,
     pub last_keep_alive: Instant,
 }
 
@@ -19,7 +20,15 @@ impl Default for State {
             rsa: Default::default(),
             uuid: Default::default(),
             crack: false,
+            coordinate: Default::default(),
             last_keep_alive: Instant::now(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Coordinate {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }

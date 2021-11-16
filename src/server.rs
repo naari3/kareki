@@ -244,7 +244,6 @@ impl Reader {
     pub async fn run(mut self) -> Result<()> {
         loop {
             let packet = self.read::<PlayPacket>().await?;
-            println!("receive packet: {:?}", packet);
             let result = self.received_packets.send_async(packet).await;
             if result.is_err() {
                 return Ok(());
@@ -267,8 +266,9 @@ impl Reader {
                         let next_cursor = cursor.position() as usize;
                         self.buffer = self.buffer.split_off(next_cursor);
 
-                        if let Ok(packet) = P::packet_read(&mut buf2_cur) {
-                            return Ok(packet);
+                        match P::packet_read(&mut buf2_cur) {
+                            Ok(packet) => return Ok(packet),
+                            Err(err) => println!("err: {:?}", err),
                         }
                     }
                 }

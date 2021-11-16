@@ -137,10 +137,11 @@ impl PacketReadEnum for PlayPacket {
             0x12 => {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
             }
+            0x2C => PlayPacket::PlayerBlockPlacement(PlayerBlockPlacement::proto_decode(src)?),
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "Unsupported PlayPacket",
+                    format!("Unsupported PlayPacket: 0x{:>02x}", packet_id),
                 ))
             }
         })

@@ -7,9 +7,9 @@ use std::{
 use crate::{
     packet::{
         client::{self, KeepAlive},
-        server::{self, PlayPacket},
+        server::{self, PlayPacket, PlayerPosition, PlayerPositionAndRotation},
     },
-    state::State,
+    state::{Coordinate, State},
 };
 
 pub struct Client {
@@ -33,31 +33,12 @@ impl Client {
 
     pub fn update_play(&mut self) -> Result<()> {
         let packets = self.received_packets_rx.try_iter().collect::<Vec<_>>();
-        for packet in packets.iter() {
+        for packet in packets.into_iter() {
             if self.state.last_keep_alive.elapsed().as_secs() > 10 {
                 self.state.last_keep_alive = Instant::now();
                 self.keep_alive()?;
             }
-            match packet {
-                PlayPacket::ClientSettings(client_settings) => {
-                    println!("client settings: {:?}", client_settings);
-                }
-                PlayPacket::KeepAlive(keep_alive) => {
-                    println!("keep alive: {:?}", keep_alive);
-                }
-                PlayPacket::PlayerPosition(player_position) => {
-                    println!("player position: {:?}", player_position);
-                }
-                PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
-                    println!(
-                        "player position and rotation: {:?}",
-                        player_position_and_rotation
-                    );
-                }
-                PlayPacket::PlayerBlockPlacement(placement) => {
-                    println!("placement: {:?}", placement);
-                }
-            }
+            self.handle_packet(packet)?;
         }
         Ok(())
     }
@@ -69,6 +50,28 @@ impl Client {
 }
 
 impl Client {
+    fn handle_packet(&mut self, packet: PlayPacket) -> Result<()> {
+        match packet {
+            PlayPacket::ClientSettings(client_settings) => {
+                println!("client settings: {:?}", client_settings);
+            }
+            PlayPacket::KeepAlive(_keep_alive) => {}
+            PlayPacket::PlayerPosition(player_position) => {
+                let PlayerPosition { x, feet_y, z, .. } = player_position;
+                self.set_position(x, feet_y, z)?;
+            }
+            PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
+                let PlayerPositionAndRotation { x, feet_y, z, .. } = player_position_and_rotation;
+                self.set_position(x, feet_y, z)?;
+            }
+            PlayPacket::PlayerBlockPlacement(placement) => {
+                println!("placement: {:?}", placement);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn keep_alive(&self) -> Result<()> {
         let packet = client::PlayPacket::KeepAlive(KeepAlive {
             keep_alive_id: SystemTime::now()
@@ -79,6 +82,11 @@ impl Client {
 
         self.send_play_packet(packet)?;
 
+        Ok(())
+    }
+
+    pub fn set_position(&mut self, x: f64, y: f64, z: f64) -> Result<()> {
+        self.state.coordinate = Coordinate { x, y, z };
         Ok(())
     }
 }
