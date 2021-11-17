@@ -7,9 +7,13 @@ use std::{
 use crate::{
     packet::{
         client::{self, KeepAlive},
-        server::{self, PlayPacket, PlayerPosition, PlayerPositionAndRotation},
+        server::{
+            self, CreativeInventoryAction, PlayPacket, PlayerPosition, PlayerPositionAndRotation,
+            PlayerRotation,
+        },
     },
-    state::{Coordinate, State},
+    state::{Coordinate, Rotation, State},
+    types::slot::Slot,
 };
 
 pub struct Client {
@@ -61,11 +65,34 @@ impl Client {
                 self.set_position(x, feet_y, z)?;
             }
             PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
-                let PlayerPositionAndRotation { x, feet_y, z, .. } = player_position_and_rotation;
+                let PlayerPositionAndRotation {
+                    x,
+                    feet_y,
+                    z,
+                    yaw,
+                    pitch,
+                    ..
+                } = player_position_and_rotation;
                 self.set_position(x, feet_y, z)?;
+                self.set_rotation(yaw, pitch)?;
             }
             PlayPacket::PlayerBlockPlacement(placement) => {
                 println!("placement: {:?}", placement);
+            }
+            PlayPacket::TeleportConfirm(teleport_confirm) => {
+                println!("teleport_confirm: {:?}", teleport_confirm);
+            }
+            PlayPacket::PlayerRotation(player_rotation) => {
+                let PlayerRotation { yaw, pitch, .. } = player_rotation;
+                self.set_rotation(yaw, pitch)?;
+            }
+            PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
+                println!("creative_inventory_action: {:?}", creative_inventory_action);
+                let CreativeInventoryAction {
+                    slot: slot_number,
+                    clicked_item,
+                } = creative_inventory_action;
+                self.set_inventory_item(slot_number as usize, clicked_item)?;
             }
         }
 
@@ -87,6 +114,16 @@ impl Client {
 
     pub fn set_position(&mut self, x: f64, y: f64, z: f64) -> Result<()> {
         self.state.coordinate = Coordinate { x, y, z };
+        Ok(())
+    }
+
+    pub fn set_rotation(&mut self, yaw: f32, pitch: f32) -> Result<()> {
+        self.state.rotation = Rotation { yaw, pitch };
+        Ok(())
+    }
+
+    pub fn set_inventory_item(&mut self, slot_number: usize, item: Slot) -> Result<()> {
+        self.state.inventory.slots[slot_number] = item;
         Ok(())
     }
 }

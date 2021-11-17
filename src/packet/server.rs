@@ -4,7 +4,7 @@ use kareki_macros::ProtocolRead;
 
 use crate::{
     protocol::ProtocolRead,
-    types::{position::Position, Arr, Var},
+    types::{item_stack_meta::ItemStackMeta, nbt::Nbt, position::Position, slot::Slot, Arr, Var},
 };
 
 use super::PacketReadEnum;
@@ -120,10 +120,13 @@ pub struct EncryptionResponse {
 
 #[derive(Debug, Clone)]
 pub enum PlayPacket {
+    /* 0x00 */ TeleportConfirm(TeleportConfirm),
     /* 0x05 */ ClientSettings(ClientSettings),
     /* 0x0F */ KeepAlive(KeepAlive),
     /* 0x11 */ PlayerPosition(PlayerPosition),
     /* 0x12 */ PlayerPositionAndRotation(PlayerPositionAndRotation),
+    /* 0x13 */ PlayerRotation(PlayerRotation),
+    /* 0x26 */ CreativeInventoryAction(CreativeInventoryAction),
     /* 0x2C */ PlayerBlockPlacement(PlayerBlockPlacement),
 }
 
@@ -131,11 +134,16 @@ impl PacketReadEnum for PlayPacket {
     fn packet_read<S: Read>(src: &mut S) -> std::io::Result<Self> {
         let packet_id = read_packet_meta(src)?;
         Ok(match packet_id {
+            0x00 => PlayPacket::TeleportConfirm(TeleportConfirm::proto_decode(src)?),
             0x05 => PlayPacket::ClientSettings(ClientSettings::proto_decode(src)?),
             0x0F => PlayPacket::KeepAlive(KeepAlive::proto_decode(src)?),
             0x11 => PlayPacket::PlayerPosition(PlayerPosition::proto_decode(src)?),
             0x12 => {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
+            }
+            0x13 => PlayPacket::PlayerRotation(PlayerRotation::proto_decode(src)?),
+            0x26 => {
+                PlayPacket::CreativeInventoryAction(CreativeInventoryAction::proto_decode(src)?)
             }
             0x2C => PlayPacket::PlayerBlockPlacement(PlayerBlockPlacement::proto_decode(src)?),
             _ => {
@@ -146,6 +154,11 @@ impl PacketReadEnum for PlayPacket {
             }
         })
     }
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
+pub struct TeleportConfirm {
+    pub teleport_id: Var<i32>,
 }
 
 #[derive(Debug, Clone, ProtocolRead)]
@@ -179,6 +192,19 @@ pub struct PlayerPositionAndRotation {
     pub yaw: f32,
     pub pitch: f32,
     pub on_ground: bool,
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
+pub struct PlayerRotation {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub on_ground: bool,
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
+pub struct CreativeInventoryAction {
+    pub slot: i16,
+    pub clicked_item: Slot,
 }
 
 #[derive(Debug, Clone, ProtocolRead)]
