@@ -10,6 +10,8 @@ mod client;
 mod server;
 mod state;
 
+mod world;
+
 pub use packet::server::{HandshakePacket, NextState};
 use server::Server;
 

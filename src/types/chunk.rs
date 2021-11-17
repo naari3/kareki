@@ -4,6 +4,7 @@ use std::io::Result;
 
 use super::chunk_section::ChunkSection;
 
+#[derive(Debug, Clone)]
 pub struct Chunk {
     pub sections: Vec<ChunkSection>,
 }

@@ -1,7 +1,7 @@
 use std::{
     io::{self, Cursor, ErrorKind, Result},
     thread::sleep,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 use aes::Aes128;
@@ -18,8 +18,20 @@ use tokio::{
     time::timeout,
 };
 
-use crate::protocol::ProtocolRead;
-use crate::{client::Client, packet::PacketWriteEnum, types::Var};
+use crate::{
+    client::Client,
+    packet::{
+        client::{BlockChange, ChunkData, KeepAlive},
+        server::{
+            CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement,
+            PlayerPositionAndRotation, PlayerRotation,
+        },
+        PacketWriteEnum,
+    },
+    state::{Coordinate, Rotation},
+    types::{chunk_section::ChunkSection, heightmap::Heightmaps, slot::Slot, Var},
+    world::World,
+};
 use crate::{
     login,
     packet::{
@@ -31,11 +43,12 @@ use crate::{
     state::State,
     HandshakePacket,
 };
-
+use crate::{packet::server::PlayerPosition, protocol::ProtocolRead};
 use crate::{
     packet::server::{NextState, StatusPacket},
     slp::handle_slp_status,
 };
+use crate::{protocol::ProtocolWrite, types::nbt::Nbt};
 use crate::{slp::handle_slp_ping, HandshakePacket::Handshake};
 
 pub type AesCfb8 = Cfb8<Aes128>;
@@ -130,6 +143,7 @@ impl Worker {
 pub struct Server {
     clients: Vec<Client>,
     receiver: flume::Receiver<Client>,
+    world: World,
 }
 
 impl Server {
@@ -177,6 +191,7 @@ impl Server {
         Self {
             clients: Vec::new(),
             receiver,
+            world: World::new().unwrap(),
         }
     }
 
@@ -200,8 +215,9 @@ impl Server {
             }
         }
         let mut will_remove = vec![];
-        for (index, client) in self.clients.iter_mut().enumerate() {
-            match client.update_play() {
+        let max_client_id = self.clients.len();
+        for index in 0..max_client_id {
+            match self.update_play(index) {
                 Ok(_) => {}
                 Err(err) => {
                     match err.kind() {
@@ -218,6 +234,152 @@ impl Server {
         }
         for index in will_remove {
             self.clients.remove(index);
+        }
+
+        Ok(())
+    }
+
+    pub fn update_play(&mut self, client_index: usize) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        if client.state.last_keep_alive.elapsed().as_secs() > 10 {
+            client.state.last_keep_alive = Instant::now();
+            client.keep_alive()?;
+        }
+        let packets = client.received_packets();
+        for packet in packets.into_iter() {
+            self.handle_packet(client_index, packet)?;
+        }
+        Ok(())
+    }
+
+    fn handle_packet(&mut self, client_index: usize, packet: PlayPacket) -> Result<()> {
+        match packet {
+            PlayPacket::ClientSettings(client_settings) => {
+                println!("client settings: {:?}", client_settings);
+            }
+            PlayPacket::KeepAlive(_keep_alive) => {}
+            PlayPacket::PlayerPosition(player_position) => {
+                let PlayerPosition { x, feet_y, z, .. } = player_position;
+                self.set_position(client_index, x, feet_y, z)?;
+            }
+            PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
+                let PlayerPositionAndRotation {
+                    x,
+                    feet_y,
+                    z,
+                    yaw,
+                    pitch,
+                    ..
+                } = player_position_and_rotation;
+                self.set_position(client_index, x, feet_y, z)?;
+                self.set_rotation(client_index, yaw, pitch)?;
+            }
+            PlayPacket::PlayerBlockPlacement(placement) => {
+                self.handle_block_placement(client_index, &placement)?;
+                // println!("item: {:?}", self.state.inventory.slots[placement.]);
+            }
+            PlayPacket::TeleportConfirm(teleport_confirm) => {
+                println!("teleport_confirm: {:?}", teleport_confirm);
+            }
+            PlayPacket::PlayerRotation(player_rotation) => {
+                let PlayerRotation { yaw, pitch, .. } = player_rotation;
+                self.set_rotation(client_index, yaw, pitch)?;
+            }
+            PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
+                let CreativeInventoryAction {
+                    slot: slot_number,
+                    clicked_item,
+                } = creative_inventory_action;
+                self.set_inventory_item(client_index, slot_number as usize, clicked_item)?;
+            }
+            PlayPacket::HeldItemChange(held_item_change) => {
+                let HeldItemChange { slot } = held_item_change;
+                let client = self.clients.get_mut(client_index).unwrap();
+                client.state.inventory.selected = slot as usize;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn keep_alive(&mut self, client_index: usize) -> Result<()> {
+        let packet = client::PlayPacket::KeepAlive(KeepAlive {
+            keep_alive_id: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
+        });
+
+        let client = self.clients.get_mut(client_index).unwrap();
+        client.send_play_packet(packet)?;
+
+        Ok(())
+    }
+
+    pub fn set_position(&mut self, client_index: usize, x: f64, y: f64, z: f64) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        client.state.coordinate = Coordinate { x, y, z };
+
+        // let chunk_x = x as i32 >> 4;
+        // let chunk_z = z as i32 >> 4;
+        // let chunk = self.world.fetch_chunk(chunk_x, chunk_z)?;
+
+        // let mut data = vec![];
+        // for section in chunk.sections.iter() {
+        //     ChunkSection::proto_encode(section, &mut data)?;
+        // }
+
+        // let packet = client::PlayPacket::ChunkData(ChunkData {
+        //     chunk_x,
+        //     chunk_z,
+        //     full_chunk: true,
+        //     primary_bit_mask: 0b1111111111111111.into(),
+        //     heightmaps: Nbt(Heightmaps::from_array(&[0; 256])),
+        //     biomes: Some(vec![0.into(); 1024]),
+        //     data,
+        //     block_entities: vec![],
+        // });
+
+        // client.send_play_packet(packet)?;
+        Ok(())
+    }
+
+    pub fn set_rotation(&mut self, client_index: usize, yaw: f32, pitch: f32) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        client.state.rotation = Rotation { yaw, pitch };
+        Ok(())
+    }
+
+    pub fn set_inventory_item(
+        &mut self,
+        client_index: usize,
+        slot_number: usize,
+        item: Option<Slot>,
+    ) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        client.state.inventory.slots[slot_number] = item;
+        Ok(())
+    }
+
+    pub fn handle_block_placement(
+        &mut self,
+        client_index: usize,
+        placement: &PlayerBlockPlacement,
+    ) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        let selected = if placement.hand.0 == 0 {
+            client.state.inventory.selected + 36
+        } else {
+            45
+        };
+        let item = client.state.inventory.slots[selected].clone();
+
+        if let Some(item) = item {
+            let packet = client::PlayPacket::BlockChange(BlockChange {
+                location: placement.location,
+                block_id: item.item_id,
+            });
+            client.send_play_packet(packet)?;
         }
 
         Ok(())

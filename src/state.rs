@@ -15,6 +15,8 @@ pub struct State {
     pub rotation: Rotation,
     pub inventory: Inventory,
     pub last_keep_alive: Instant,
+    pub last_chunk_x: i32,
+    pub last_chunk_z: i32,
 }
 
 impl Default for State {
@@ -28,6 +30,8 @@ impl Default for State {
             rotation: Default::default(),
             inventory: Default::default(),
             last_keep_alive: Instant::now(),
+            last_chunk_x: 0,
+            last_chunk_z: 0,
         }
     }
 }

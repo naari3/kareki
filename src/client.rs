@@ -20,7 +20,7 @@ use crate::{
 pub struct Client {
     packets_to_send_tx: Sender<client::PlayPacket>,
     received_packets_rx: Receiver<server::PlayPacket>,
-    state: State,
+    pub state: State,
 }
 
 impl Client {
@@ -36,16 +36,11 @@ impl Client {
         }
     }
 
-    pub fn update_play(&mut self) -> Result<()> {
-        let packets = self.received_packets_rx.try_iter().collect::<Vec<_>>();
-        for packet in packets.into_iter() {
-            if self.state.last_keep_alive.elapsed().as_secs() > 10 {
-                self.state.last_keep_alive = Instant::now();
-                self.keep_alive()?;
-            }
-            self.handle_packet(packet)?;
-        }
-        Ok(())
+    pub fn received_packets(&self) -> Vec<PlayPacket> {
+        self.received_packets_rx
+            .try_iter()
+            .collect::<Vec<_>>()
+            .clone()
     }
 
     pub fn send_play_packet(&self, packet: client::PlayPacket) -> Result<()> {
