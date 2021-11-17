@@ -6,12 +6,13 @@ use std::{
 
 use crate::{
     packet::{
-        client::{self, KeepAlive},
+        client::{self, BlockChange, KeepAlive},
         server::{
-            self, CreativeInventoryAction, PlayPacket, PlayerPosition, PlayerPositionAndRotation,
-            PlayerRotation,
+            self, CreativeInventoryAction, HeldItemChange, PlayPacket, PlayerBlockPlacement,
+            PlayerPosition, PlayerPositionAndRotation, PlayerRotation,
         },
     },
+    server::Server,
     state::{Coordinate, Rotation, State},
     types::slot::Slot,
 };
@@ -77,7 +78,8 @@ impl Client {
                 self.set_rotation(yaw, pitch)?;
             }
             PlayPacket::PlayerBlockPlacement(placement) => {
-                println!("placement: {:?}", placement);
+                self.handle_block_placement(&placement)?;
+                // println!("item: {:?}", self.state.inventory.slots[placement.]);
             }
             PlayPacket::TeleportConfirm(teleport_confirm) => {
                 println!("teleport_confirm: {:?}", teleport_confirm);
@@ -87,12 +89,15 @@ impl Client {
                 self.set_rotation(yaw, pitch)?;
             }
             PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
-                println!("creative_inventory_action: {:?}", creative_inventory_action);
                 let CreativeInventoryAction {
                     slot: slot_number,
                     clicked_item,
                 } = creative_inventory_action;
                 self.set_inventory_item(slot_number as usize, clicked_item)?;
+            }
+            PlayPacket::HeldItemChange(held_item_change) => {
+                let HeldItemChange { slot } = held_item_change;
+                self.state.inventory.selected = slot as usize;
             }
         }
 
@@ -122,8 +127,27 @@ impl Client {
         Ok(())
     }
 
-    pub fn set_inventory_item(&mut self, slot_number: usize, item: Slot) -> Result<()> {
+    pub fn set_inventory_item(&mut self, slot_number: usize, item: Option<Slot>) -> Result<()> {
         self.state.inventory.slots[slot_number] = item;
+        Ok(())
+    }
+
+    pub fn handle_block_placement(&mut self, placement: &PlayerBlockPlacement) -> Result<()> {
+        let selected = if placement.hand.0 == 0 {
+            self.state.inventory.selected + 36
+        } else {
+            45
+        };
+        let item = self.state.inventory.slots[selected].clone();
+
+        if let Some(item) = item {
+            let packet = client::PlayPacket::BlockChange(BlockChange {
+                location: placement.location,
+                block_id: item.item_id,
+            });
+            self.send_play_packet(packet)?;
+        }
+
         Ok(())
     }
 }

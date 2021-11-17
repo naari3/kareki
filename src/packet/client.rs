@@ -84,6 +84,7 @@ pub struct SetCompression {
 }
 
 pub enum PlayPacket {
+    BlockChange(BlockChange),                     // 0x0C
     DeclareCommands(DeclareCommands),             // 0x12
     EntityStatus(EntityStatus),                   // 0x1C
     KeepAlive(KeepAlive),                         // 0x21
@@ -103,6 +104,7 @@ pub enum PlayPacket {
 impl PacketWriteEnum for PlayPacket {
     fn packet_write<D: Write>(&self, dst: &mut D) -> io::Result<()> {
         match self {
+            PlayPacket::BlockChange(packet) => packet.packet_write(dst),
             PlayPacket::DeclareCommands(packet) => packet.packet_write(dst),
             PlayPacket::EntityStatus(packet) => packet.packet_write(dst),
             PlayPacket::KeepAlive(packet) => packet.packet_write(dst),
@@ -120,6 +122,13 @@ impl PacketWriteEnum for PlayPacket {
             PlayPacket::Tags(packet) => packet.packet_write(dst),
         }
     }
+}
+
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x0C]
+pub struct BlockChange {
+    pub location: Position,
+    pub block_id: Var<i32>,
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]

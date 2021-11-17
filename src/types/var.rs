@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::io;
 use std::io::{Read, Write};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Var<T>(pub T);
 
 impl From<i32> for Var<i32> {

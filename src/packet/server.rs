@@ -1,10 +1,10 @@
-use std::io::{self, Cursor, Read};
+use std::io::{self, Read};
 
 use kareki_macros::ProtocolRead;
 
 use crate::{
     protocol::ProtocolRead,
-    types::{item_stack_meta::ItemStackMeta, nbt::Nbt, position::Position, slot::Slot, Arr, Var},
+    types::{position::Position, slot::Slot, Arr, Var},
 };
 
 use super::PacketReadEnum;
@@ -126,6 +126,7 @@ pub enum PlayPacket {
     /* 0x11 */ PlayerPosition(PlayerPosition),
     /* 0x12 */ PlayerPositionAndRotation(PlayerPositionAndRotation),
     /* 0x13 */ PlayerRotation(PlayerRotation),
+    /* 0x23 */ HeldItemChange(HeldItemChange),
     /* 0x26 */ CreativeInventoryAction(CreativeInventoryAction),
     /* 0x2C */ PlayerBlockPlacement(PlayerBlockPlacement),
 }
@@ -142,6 +143,7 @@ impl PacketReadEnum for PlayPacket {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
             }
             0x13 => PlayPacket::PlayerRotation(PlayerRotation::proto_decode(src)?),
+            0x23 => PlayPacket::HeldItemChange(HeldItemChange::proto_decode(src)?),
             0x26 => {
                 PlayPacket::CreativeInventoryAction(CreativeInventoryAction::proto_decode(src)?)
             }
@@ -202,9 +204,28 @@ pub struct PlayerRotation {
 }
 
 #[derive(Debug, Clone, ProtocolRead)]
+pub struct HeldItemChange {
+    pub slot: i16,
+}
+
+#[derive(Debug, Clone)]
 pub struct CreativeInventoryAction {
     pub slot: i16,
-    pub clicked_item: Slot,
+    pub clicked_item: Option<Slot>,
+}
+
+impl ProtocolRead for CreativeInventoryAction {
+    fn proto_decode<S: Read>(src: &mut S) -> io::Result<Self> {
+        let slot = i16::proto_decode(src)?;
+        let present = bool::proto_decode(src)?;
+        let clicked_item = if present {
+            Some(Slot::proto_decode(src)?)
+        } else {
+            None
+        };
+
+        Ok(Self { slot, clicked_item })
+    }
 }
 
 #[derive(Debug, Clone, ProtocolRead)]

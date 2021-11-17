@@ -47,13 +47,15 @@ pub struct Rotation {
 
 #[derive(Debug, Clone)]
 pub struct Inventory {
-    pub slots: Vec<Slot>,
+    pub slots: Vec<Option<Slot>>,
+    pub selected: usize,
 }
 
 impl Default for Inventory {
     fn default() -> Self {
         Self {
-            slots: vec![Default::default(); 50],
+            slots: vec![Default::default(); 46],
+            selected: 0,
         }
     }
 }
