@@ -284,6 +284,30 @@ impl Server {
             }
             PlayPacket::TeleportConfirm(teleport_confirm) => {
                 println!("teleport_confirm: {:?}", teleport_confirm);
+
+                let client = self.clients.get_mut(client_index).unwrap();
+
+                let center_chunk_x = (client.state.coordinate.x as i32) >> 4;
+                let center_chunk_z = (client.state.coordinate.x as i32) >> 4;
+
+                let chunk = self.world.fetch_chunk(center_chunk_x, center_chunk_z)?;
+                let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
+                client.send_play_packet(packet)?;
+
+                let view_distance = 2;
+                let diff = view_distance * 1;
+                for x in center_chunk_x - diff..=center_chunk_x + diff {
+                    for z in center_chunk_z - diff..=center_chunk_z + diff {
+                        if x == center_chunk_x && z == center_chunk_z {
+                            continue;
+                        }
+                        let chunk = self.world.fetch_chunk(x, z)?;
+
+                        let packet = chunk.clone().to_packet(x, z)?;
+
+                        client.send_play_packet(packet)?;
+                    }
+                }
             }
             PlayPacket::PlayerRotation(player_rotation) => {
                 let PlayerRotation { yaw, pitch, .. } = player_rotation;
@@ -347,15 +371,7 @@ impl Server {
                     let should_be_loaded =
                         Self::get_chunk_distance(x, z, chunk_x, chunk_z) <= view_distance as u32;
 
-                    if was_loaded && !should_be_loaded {
-                        println!("unload x: {:?} z: {:?}", x, z);
-                        let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
-                            chunk_x: x,
-                            chunk_z: z,
-                        });
-                        client.send_play_packet(packet)?;
-                        println!("unloaded");
-                    } else if !was_loaded && should_be_loaded {
+                    if !was_loaded && should_be_loaded {
                         println!("load x: {:?} z: {:?}", x, z);
                         let chunk = self.world.fetch_chunk(x, z)?;
 
@@ -363,6 +379,14 @@ impl Server {
 
                         client.send_play_packet(packet)?;
                         println!("loaded");
+                    } else if was_loaded && !should_be_loaded {
+                        println!("unload x: {:?} z: {:?}", x, z);
+                        let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
+                            chunk_x: x,
+                            chunk_z: z,
+                        });
+                        client.send_play_packet(packet)?;
+                        println!("unloaded");
                     }
                 }
             }
@@ -572,7 +596,7 @@ pub async fn handle_login_handshake(worker: &mut Worker) -> Result<()> {
     play::player_info(worker).await?;
     play::update_view_position(worker).await?;
     play::update_light(worker).await?;
-    play::chunk_data(worker).await?;
+    // play::chunk_data(worker).await?;
     play::world_border(worker).await?;
     play::spawn_position(worker).await?;
     play::play_position_and_look(worker).await?;
