@@ -31,9 +31,6 @@ impl Heightmaps {
             let u64 = &mut bits[u64_index];
             *u64 &= !(mask << bit_index);
             *u64 |= (value as u64) << bit_index;
-            if index == 249 {
-                println!("aaa");
-            }
             if is_over {
                 let u64_index = u64_index + 1;
                 let bit_index = (bit_index + bits_per_byte) % 64;

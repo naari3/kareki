@@ -21,7 +21,7 @@ use tokio::{
 use crate::{
     client::Client,
     packet::{
-        client::{BlockChange, ChunkData, KeepAlive},
+        client::{BlockChange, KeepAlive, UnloadChunk},
         server::{
             CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement,
             PlayerPositionAndRotation, PlayerRotation,
@@ -29,7 +29,7 @@ use crate::{
         PacketWriteEnum,
     },
     state::{Coordinate, Rotation},
-    types::{chunk_section::ChunkSection, heightmap::Heightmaps, slot::Slot, Var},
+    types::{position::Position, slot::Slot, Var},
     world::World,
 };
 use crate::{
@@ -48,7 +48,6 @@ use crate::{
     packet::server::{NextState, StatusPacket},
     slp::handle_slp_status,
 };
-use crate::{protocol::ProtocolWrite, types::nbt::Nbt};
 use crate::{slp::handle_slp_ping, HandshakePacket::Handshake};
 
 pub type AesCfb8 = Cfb8<Aes128>;
@@ -260,6 +259,7 @@ impl Server {
             PlayPacket::KeepAlive(_keep_alive) => {}
             PlayPacket::PlayerPosition(player_position) => {
                 let PlayerPosition { x, feet_y, z, .. } = player_position;
+                // println!("player_position: {:?}", player_position);
                 self.set_position(client_index, x, feet_y, z)?;
             }
             PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
@@ -271,6 +271,10 @@ impl Server {
                     pitch,
                     ..
                 } = player_position_and_rotation;
+                // println!(
+                //     "player_position_and_rotation: {:?}",
+                //     player_position_and_rotation
+                // );
                 self.set_position(client_index, x, feet_y, z)?;
                 self.set_rotation(client_index, yaw, pitch)?;
             }
@@ -320,27 +324,49 @@ impl Server {
         let client = self.clients.get_mut(client_index).unwrap();
         client.state.coordinate = Coordinate { x, y, z };
 
-        // let chunk_x = x as i32 >> 4;
-        // let chunk_z = z as i32 >> 4;
-        // let chunk = self.world.fetch_chunk(chunk_x, chunk_z)?;
+        let view_distance = 2;
+        let chunk_x = x as i32 >> 4;
+        let chunk_z = z as i32 >> 4;
+        println!("current chunk x: {:?} z: {:?}", chunk_x, chunk_z);
+        let last_chunk_x = client.state.last_chunk_x;
+        let last_chunk_z = client.state.last_chunk_z;
 
-        // let mut data = vec![];
-        // for section in chunk.sections.iter() {
-        //     ChunkSection::proto_encode(section, &mut data)?;
-        // }
+        client.state.last_chunk_x = chunk_x;
+        client.state.last_chunk_z = chunk_z;
 
-        // let packet = client::PlayPacket::ChunkData(ChunkData {
-        //     chunk_x,
-        //     chunk_z,
-        //     full_chunk: true,
-        //     primary_bit_mask: 0b1111111111111111.into(),
-        //     heightmaps: Nbt(Heightmaps::from_array(&[0; 256])),
-        //     biomes: Some(vec![0.into(); 1024]),
-        //     data,
-        //     block_entities: vec![],
-        // });
+        if last_chunk_x != chunk_x || last_chunk_z != chunk_z {
+            let nx = last_chunk_x.min(chunk_x) - 2 * view_distance;
+            let nz = last_chunk_z.min(chunk_z) - 2 * view_distance;
+            let px = last_chunk_x.max(chunk_x) + 2 * view_distance;
+            let pz = last_chunk_z.max(chunk_z) + 2 * view_distance;
 
-        // client.send_play_packet(packet)?;
+            for x in nx..=px {
+                for z in nz..=pz {
+                    let was_loaded = Self::get_chunk_distance(x, z, last_chunk_x, last_chunk_z)
+                        <= view_distance as u32;
+                    let should_be_loaded =
+                        Self::get_chunk_distance(x, z, chunk_x, chunk_z) <= view_distance as u32;
+
+                    if was_loaded && !should_be_loaded {
+                        println!("unload x: {:?} z: {:?}", x, z);
+                        let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
+                            chunk_x: x,
+                            chunk_z: z,
+                        });
+                        client.send_play_packet(packet)?;
+                        println!("unloaded");
+                    } else if !was_loaded && should_be_loaded {
+                        println!("load x: {:?} z: {:?}", x, z);
+                        let chunk = self.world.fetch_chunk(x, z)?;
+
+                        let packet = chunk.clone().to_packet(x, z)?;
+
+                        client.send_play_packet(packet)?;
+                        println!("loaded");
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -375,6 +401,10 @@ impl Server {
         let item = client.state.inventory.slots[selected].clone();
 
         if let Some(item) = item {
+            let Position { x, y, z } = placement.location;
+            self.world
+                .set_block(x as usize, y as usize, z as usize, item.item_id.0 as u16)?;
+
             let packet = client::PlayPacket::BlockChange(BlockChange {
                 location: placement.location,
                 block_id: item.item_id,
@@ -383,6 +413,12 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    fn get_chunk_distance(x1: i32, z1: i32, x2: i32, z2: i32) -> u32 {
+        let x = x1 - x2;
+        let z = z1 - z2;
+        x.abs().max(z.abs()) as u32
     }
 }
 

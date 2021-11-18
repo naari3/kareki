@@ -4,9 +4,9 @@ use crate::protocol::{ProtocolLen, ProtocolRead, ProtocolWrite};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
-    pub x: u32,
-    pub y: u16,
-    pub z: u32,
+    pub x: i32,
+    pub y: i16,
+    pub z: i32,
 }
 impl ProtocolLen for Position {
     fn proto_len(_value: &Self) -> usize {
@@ -27,11 +27,11 @@ impl ProtocolWrite for Position {
 
 impl ProtocolRead for Position {
     fn proto_decode<S: Read>(src: &mut S) -> std::io::Result<Self> {
-        let datum = u64::proto_decode(src)?;
+        let datum = i64::proto_decode(src)?;
         Ok(Self {
-            x: (datum >> 38) as u32,
-            y: (datum & 0xFFF) as u16,
-            z: (datum << 26 >> 38) as u32,
+            x: (datum >> 38) as i32,
+            y: (datum & 0xFFF) as i16,
+            z: (datum << 26 >> 38) as i32,
         })
     }
 }
