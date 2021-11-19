@@ -36,10 +36,32 @@ impl Chunk {
         }
     }
 
+    pub fn get_heighest_position(&self, x: usize, z: usize) -> Result<u16> {
+        let mut heighest = 0;
+        for s in self.sections.iter() {
+            for y in 0..16 {
+                let section_y = match s.get_block(x, y, z) {
+                    Some(y) => y,
+                    None => 0,
+                };
+                if heighest < section_y {
+                    heighest = section_y;
+                }
+            }
+        }
+        Ok(heighest)
+    }
+
     pub fn to_packet(self, chunk_x: i32, chunk_z: i32) -> Result<client::PlayPacket> {
         let mut data = vec![];
         for section in self.sections.iter() {
             ChunkSection::proto_encode(section, &mut data)?;
+        }
+        let mut height_map = [0; 256];
+        for x in 0..16 {
+            for z in 0..16 {
+                height_map[(x * 16) + z] = self.get_heighest_position(x, z)?;
+            }
         }
 
         let packet = client::PlayPacket::ChunkData(ChunkData {
@@ -47,7 +69,7 @@ impl Chunk {
             chunk_z,
             full_chunk: true,
             primary_bit_mask: 0b1111111111111111.into(),
-            heightmaps: Nbt(Heightmaps::from_array(&[0; 256])),
+            heightmaps: Nbt(Heightmaps::from_array(&height_map)),
             biomes: Some(vec![0.into(); 1024]),
             data,
             block_entities: vec![],
