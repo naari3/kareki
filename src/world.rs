@@ -29,13 +29,18 @@ impl World {
         Ok(world)
     }
 
-    // chunk generate and return
+    // get chunk or chunk generate and return
     pub fn fetch_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<&mut Chunk> {
         let chunk = self
             .chunks
             .entry((chunk_x, chunk_z))
-            .or_insert(Chunk::empty());
+            .or_insert(Self::generate_chunk()?);
 
+        Ok(chunk)
+    }
+
+    fn generate_chunk() -> Result<Chunk> {
+        let mut chunk = Chunk::empty();
         for x in 0..16 {
             for z in 0..16 {
                 for y in 0..16 {
@@ -45,7 +50,6 @@ impl World {
                 }
             }
         }
-
         Ok(chunk)
     }
 

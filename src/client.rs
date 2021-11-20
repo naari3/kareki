@@ -83,6 +83,9 @@ impl Client {
                 let PlayerRotation { yaw, pitch, .. } = player_rotation;
                 self.set_rotation(yaw, pitch)?;
             }
+            PlayPacket::PlayerDigging(player_digging) => {
+                println!("player_digging: {:?}", player_digging);
+            }
             PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
                 let CreativeInventoryAction {
                     slot: slot_number,

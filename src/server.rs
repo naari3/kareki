@@ -23,13 +23,15 @@ use crate::{
     packet::{
         client::{BlockChange, KeepAlive, UnloadChunk},
         server::{
-            CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement,
+            CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement, PlayerDigging,
             PlayerPositionAndRotation, PlayerRotation,
         },
         PacketWriteEnum,
     },
     state::{Coordinate, Rotation},
-    types::{position::Position, slot::Slot, Var},
+    types::{
+        block_face::BlockFace, digging_status::DiggingStatus, position::Position, slot::Slot, Var,
+    },
     world::World,
 };
 use crate::{
@@ -313,6 +315,9 @@ impl Server {
                 let PlayerRotation { yaw, pitch, .. } = player_rotation;
                 self.set_rotation(client_index, yaw, pitch)?;
             }
+            PlayPacket::PlayerDigging(player_digging) => {
+                self.handle_block_digging(client_index, &player_digging)?;
+            }
             PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
                 let CreativeInventoryAction {
                     slot: slot_number,
@@ -351,7 +356,6 @@ impl Server {
         let view_distance = 2;
         let chunk_x = x as i32 >> 4;
         let chunk_z = z as i32 >> 4;
-        println!("current chunk x: {:?} z: {:?}", chunk_x, chunk_z);
         let last_chunk_x = client.state.last_chunk_x;
         let last_chunk_z = client.state.last_chunk_z;
 
@@ -372,21 +376,19 @@ impl Server {
                         Self::get_chunk_distance(x, z, chunk_x, chunk_z) <= view_distance as u32;
 
                     if !was_loaded && should_be_loaded {
-                        println!("load x: {:?} z: {:?}", x, z);
+                        // println!("load x: {:?} z: {:?}", x, z);
                         let chunk = self.world.fetch_chunk(x, z)?;
 
                         let packet = chunk.clone().to_packet(x, z)?;
 
                         client.send_play_packet(packet)?;
-                        println!("loaded");
                     } else if was_loaded && !should_be_loaded {
-                        println!("unload x: {:?} z: {:?}", x, z);
+                        // println!("unload x: {:?} z: {:?}", x, z);
                         let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
                             chunk_x: x,
                             chunk_z: z,
                         });
                         client.send_play_packet(packet)?;
-                        println!("unloaded");
                     }
                 }
             }
@@ -426,12 +428,7 @@ impl Server {
 
         if let Some(item) = item {
             println!("placement: {:?}", placement);
-            let block_pos = Self::fix_position_by_cursor_point(
-                placement.location,
-                placement.cursor_point_x,
-                placement.cursor_point_y,
-                placement.cursor_point_z,
-            );
+            let block_pos = placement.location.offset(placement.face);
             println!("block_pos: {:?}, item_id: {:?}", block_pos, item.item_id);
             self.world.set_block(
                 block_pos.x as usize,
@@ -450,44 +447,34 @@ impl Server {
         Ok(())
     }
 
+    pub fn handle_block_digging(
+        &mut self,
+        client_index: usize,
+        digging: &PlayerDigging,
+    ) -> Result<()> {
+        let client = self.clients.get_mut(client_index).unwrap();
+        println!("digging: {:?}", digging);
+        if let DiggingStatus::StartedDigging = digging.status {
+            self.world.set_block(
+                digging.location.x as usize,
+                digging.location.y as usize,
+                digging.location.z as usize,
+                0,
+            )?;
+            let packet = client::PlayPacket::BlockChange(BlockChange {
+                location: digging.location,
+                block_id: Var(0),
+            });
+            client.send_play_packet(packet)?;
+        }
+
+        Ok(())
+    }
+
     fn get_chunk_distance(x1: i32, z1: i32, x2: i32, z2: i32) -> u32 {
         let x = x1 - x2;
         let z = z1 - z2;
         x.abs().max(z.abs()) as u32
-    }
-
-    fn fix_position_by_cursor_point(
-        position: Position,
-        cursor_point_x: f32,
-        cursor_point_y: f32,
-        cursor_point_z: f32,
-    ) -> Position {
-        Position {
-            x: position.x
-                + if cursor_point_x == 1.0 {
-                    1
-                } else if cursor_point_x == 0.0 {
-                    -1
-                } else {
-                    0
-                },
-            y: position.y
-                + if cursor_point_y == 1.0 {
-                    1
-                } else if cursor_point_y == 0.0 {
-                    -1
-                } else {
-                    0
-                },
-            z: position.z
-                + if cursor_point_z == 1.0 {
-                    1
-                } else if cursor_point_z == 0.0 {
-                    -1
-                } else {
-                    0
-                },
-        }
     }
 }
 

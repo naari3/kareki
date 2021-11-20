@@ -1,8 +1,10 @@
 pub mod arr;
 pub mod block_entity;
+pub mod block_face;
 pub mod bool;
 pub mod chunk;
 pub mod chunk_section;
+pub mod digging_status;
 pub mod heightmap;
 pub mod item_stack_meta;
 pub mod nbt;

@@ -19,6 +19,8 @@ aes = "0.3"
 cfb8 = "0.3"
 bufstream = "0.1"
 num = "0.2.1"
+num-derive = "0.2"
+num-traits = "0.2"
 hematite-nbt = "0.5.2"
 bytes = "1.1.0"
 kareki-macros = { path = "macros" }

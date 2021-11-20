@@ -4,7 +4,13 @@ use kareki_macros::ProtocolRead;
 
 use crate::{
     protocol::ProtocolRead,
-    types::{position::Position, slot::Slot, Arr, Var},
+    types::{
+        block_face::{BlockFace, BlockFaceU8},
+        digging_status::DiggingStatus,
+        position::Position,
+        slot::Slot,
+        Arr, Var,
+    },
 };
 
 use super::PacketReadEnum;
@@ -126,6 +132,7 @@ pub enum PlayPacket {
     /* 0x11 */ PlayerPosition(PlayerPosition),
     /* 0x12 */ PlayerPositionAndRotation(PlayerPositionAndRotation),
     /* 0x13 */ PlayerRotation(PlayerRotation),
+    /* 0x1A */ PlayerDigging(PlayerDigging),
     /* 0x23 */ HeldItemChange(HeldItemChange),
     /* 0x26 */ CreativeInventoryAction(CreativeInventoryAction),
     /* 0x2C */ PlayerBlockPlacement(PlayerBlockPlacement),
@@ -143,6 +150,7 @@ impl PacketReadEnum for PlayPacket {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
             }
             0x13 => PlayPacket::PlayerRotation(PlayerRotation::proto_decode(src)?),
+            0x1A => PlayPacket::PlayerDigging(PlayerDigging::proto_decode(src)?),
             0x23 => PlayPacket::HeldItemChange(HeldItemChange::proto_decode(src)?),
             0x26 => {
                 PlayPacket::CreativeInventoryAction(CreativeInventoryAction::proto_decode(src)?)
@@ -204,6 +212,13 @@ pub struct PlayerRotation {
 }
 
 #[derive(Debug, Clone, ProtocolRead)]
+pub struct PlayerDigging {
+    pub status: DiggingStatus,
+    pub location: Position,
+    pub face: BlockFaceU8,
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
 pub struct HeldItemChange {
     pub slot: i16,
 }
@@ -232,7 +247,7 @@ impl ProtocolRead for CreativeInventoryAction {
 pub struct PlayerBlockPlacement {
     pub hand: Var<i32>,
     pub location: Position,
-    pub face: Var<i32>,
+    pub face: BlockFace,
     pub cursor_point_x: f32,
     pub cursor_point_y: f32,
     pub cursor_point_z: f32,
