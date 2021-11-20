@@ -425,12 +425,23 @@ impl Server {
         let item = client.state.inventory.slots[selected].clone();
 
         if let Some(item) = item {
-            let Position { x, y, z } = placement.location;
-            self.world
-                .set_block(x as usize, y as usize, z as usize, item.item_id.0 as u16)?;
+            println!("placement: {:?}", placement);
+            let block_pos = Self::fix_position_by_cursor_point(
+                placement.location,
+                placement.cursor_point_x,
+                placement.cursor_point_y,
+                placement.cursor_point_z,
+            );
+            println!("block_pos: {:?}, item_id: {:?}", block_pos, item.item_id);
+            self.world.set_block(
+                block_pos.x as usize,
+                block_pos.y as usize,
+                block_pos.z as usize,
+                item.item_id.0 as u16,
+            )?;
 
             let packet = client::PlayPacket::BlockChange(BlockChange {
-                location: placement.location,
+                location: block_pos,
                 block_id: item.item_id,
             });
             client.send_play_packet(packet)?;
@@ -443,6 +454,40 @@ impl Server {
         let x = x1 - x2;
         let z = z1 - z2;
         x.abs().max(z.abs()) as u32
+    }
+
+    fn fix_position_by_cursor_point(
+        position: Position,
+        cursor_point_x: f32,
+        cursor_point_y: f32,
+        cursor_point_z: f32,
+    ) -> Position {
+        Position {
+            x: position.x
+                + if cursor_point_x == 1.0 {
+                    1
+                } else if cursor_point_x == 0.0 {
+                    -1
+                } else {
+                    0
+                },
+            y: position.y
+                + if cursor_point_y == 1.0 {
+                    1
+                } else if cursor_point_y == 0.0 {
+                    -1
+                } else {
+                    0
+                },
+            z: position.z
+                + if cursor_point_z == 1.0 {
+                    1
+                } else if cursor_point_z == 0.0 {
+                    -1
+                } else {
+                    0
+                },
+        }
     }
 }
 

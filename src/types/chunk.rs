@@ -70,7 +70,7 @@ impl Chunk {
             full_chunk: true,
             primary_bit_mask: 0b1111111111111111.into(),
             heightmaps: Nbt(Heightmaps::from_array(&height_map)),
-            biomes: Some(vec![0.into(); 1024]),
+            biomes: Some(vec![127.into(); 1024]),
             data,
             block_entities: vec![],
         });
