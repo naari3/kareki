@@ -132,7 +132,9 @@ pub enum PlayPacket {
     /* 0x11 */ PlayerPosition(PlayerPosition),
     /* 0x12 */ PlayerPositionAndRotation(PlayerPositionAndRotation),
     /* 0x13 */ PlayerRotation(PlayerRotation),
+    /* 0x1A */ PlayerAbilities(PlayerAbilities),
     /* 0x1A */ PlayerDigging(PlayerDigging),
+    /* 0x1B */ EntityAction(EntityAction),
     /* 0x23 */ HeldItemChange(HeldItemChange),
     /* 0x26 */ CreativeInventoryAction(CreativeInventoryAction),
     /* 0x2C */ PlayerBlockPlacement(PlayerBlockPlacement),
@@ -150,7 +152,9 @@ impl PacketReadEnum for PlayPacket {
                 PlayPacket::PlayerPositionAndRotation(PlayerPositionAndRotation::proto_decode(src)?)
             }
             0x13 => PlayPacket::PlayerRotation(PlayerRotation::proto_decode(src)?),
+            0x19 => PlayPacket::PlayerAbilities(PlayerAbilities::proto_decode(src)?),
             0x1A => PlayPacket::PlayerDigging(PlayerDigging::proto_decode(src)?),
+            0x1B => PlayPacket::EntityAction(EntityAction::proto_decode(src)?),
             0x23 => PlayPacket::HeldItemChange(HeldItemChange::proto_decode(src)?),
             0x26 => {
                 PlayPacket::CreativeInventoryAction(CreativeInventoryAction::proto_decode(src)?)
@@ -212,10 +216,24 @@ pub struct PlayerRotation {
 }
 
 #[derive(Debug, Clone, ProtocolRead)]
+pub struct PlayerAbilities {
+    pub flags: u8,
+    pub flying_speed: f32,
+    pub walking_speed: f32,
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
 pub struct PlayerDigging {
     pub status: DiggingStatus,
     pub location: Position,
     pub face: BlockFaceU8,
+}
+
+#[derive(Debug, Clone, ProtocolRead)]
+pub struct EntityAction {
+    pub entity_id: Var<i32>,
+    pub action_id: Var<i32>,
+    pub jump_boost: Var<i32>,
 }
 
 #[derive(Debug, Clone, ProtocolRead)]

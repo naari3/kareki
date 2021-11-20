@@ -315,8 +315,14 @@ impl Server {
                 let PlayerRotation { yaw, pitch, .. } = player_rotation;
                 self.set_rotation(client_index, yaw, pitch)?;
             }
+            PlayPacket::PlayerAbilities(player_abilities) => {
+                println!("player_abilities: {:?}", player_abilities);
+            }
             PlayPacket::PlayerDigging(player_digging) => {
                 self.handle_block_digging(client_index, &player_digging)?;
+            }
+            PlayPacket::EntityAction(_entity_action) => {
+                // println!("entity_action: {:?}", _entity_action);
             }
             PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
                 let CreativeInventoryAction {

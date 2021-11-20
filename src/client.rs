@@ -50,58 +50,6 @@ impl Client {
 }
 
 impl Client {
-    fn handle_packet(&mut self, packet: PlayPacket) -> Result<()> {
-        match packet {
-            PlayPacket::ClientSettings(client_settings) => {
-                println!("client settings: {:?}", client_settings);
-            }
-            PlayPacket::KeepAlive(_keep_alive) => {}
-            PlayPacket::PlayerPosition(player_position) => {
-                let PlayerPosition { x, feet_y, z, .. } = player_position;
-                self.set_position(x, feet_y, z)?;
-            }
-            PlayPacket::PlayerPositionAndRotation(player_position_and_rotation) => {
-                let PlayerPositionAndRotation {
-                    x,
-                    feet_y,
-                    z,
-                    yaw,
-                    pitch,
-                    ..
-                } = player_position_and_rotation;
-                self.set_position(x, feet_y, z)?;
-                self.set_rotation(yaw, pitch)?;
-            }
-            PlayPacket::PlayerBlockPlacement(placement) => {
-                self.handle_block_placement(&placement)?;
-                // println!("item: {:?}", self.state.inventory.slots[placement.]);
-            }
-            PlayPacket::TeleportConfirm(teleport_confirm) => {
-                println!("teleport_confirm: {:?}", teleport_confirm);
-            }
-            PlayPacket::PlayerRotation(player_rotation) => {
-                let PlayerRotation { yaw, pitch, .. } = player_rotation;
-                self.set_rotation(yaw, pitch)?;
-            }
-            PlayPacket::PlayerDigging(player_digging) => {
-                println!("player_digging: {:?}", player_digging);
-            }
-            PlayPacket::CreativeInventoryAction(creative_inventory_action) => {
-                let CreativeInventoryAction {
-                    slot: slot_number,
-                    clicked_item,
-                } = creative_inventory_action;
-                self.set_inventory_item(slot_number as usize, clicked_item)?;
-            }
-            PlayPacket::HeldItemChange(held_item_change) => {
-                let HeldItemChange { slot } = held_item_change;
-                self.state.inventory.selected = slot as usize;
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn keep_alive(&self) -> Result<()> {
         let packet = client::PlayPacket::KeepAlive(KeepAlive {
             keep_alive_id: SystemTime::now()
