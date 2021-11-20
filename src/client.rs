@@ -1,20 +1,12 @@
 use flume::{Receiver, Sender};
-use std::{
-    io::Result,
-    time::{Instant, SystemTime},
-};
+use std::{io::Result, time::SystemTime};
 
 use crate::{
     packet::{
-        client::{self, BlockChange, KeepAlive},
-        server::{
-            self, CreativeInventoryAction, HeldItemChange, PlayPacket, PlayerBlockPlacement,
-            PlayerPosition, PlayerPositionAndRotation, PlayerRotation,
-        },
+        client::{self, KeepAlive},
+        server::{self, PlayPacket},
     },
-    server::Server,
-    state::{Coordinate, Rotation, State},
-    types::slot::Slot,
+    state::State,
 };
 
 pub struct Client {
@@ -59,40 +51,6 @@ impl Client {
         });
 
         self.send_play_packet(packet)?;
-
-        Ok(())
-    }
-
-    pub fn set_position(&mut self, x: f64, y: f64, z: f64) -> Result<()> {
-        self.state.coordinate = Coordinate { x, y, z };
-        Ok(())
-    }
-
-    pub fn set_rotation(&mut self, yaw: f32, pitch: f32) -> Result<()> {
-        self.state.rotation = Rotation { yaw, pitch };
-        Ok(())
-    }
-
-    pub fn set_inventory_item(&mut self, slot_number: usize, item: Option<Slot>) -> Result<()> {
-        self.state.inventory.slots[slot_number] = item;
-        Ok(())
-    }
-
-    pub fn handle_block_placement(&mut self, placement: &PlayerBlockPlacement) -> Result<()> {
-        let selected = if placement.hand.0 == 0 {
-            self.state.inventory.selected + 36
-        } else {
-            45
-        };
-        let item = self.state.inventory.slots[selected].clone();
-
-        if let Some(item) = item {
-            let packet = client::PlayPacket::BlockChange(BlockChange {
-                location: placement.location,
-                block_id: item.item_id,
-            });
-            self.send_play_packet(packet)?;
-        }
 
         Ok(())
     }
