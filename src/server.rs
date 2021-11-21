@@ -284,34 +284,9 @@ impl Server {
             }
             PlayPacket::PlayerBlockPlacement(placement) => {
                 self.handle_block_placement(client_index, &placement)?;
-                // println!("item: {:?}", self.state.inventory.slots[placement.]);
             }
             PlayPacket::TeleportConfirm(teleport_confirm) => {
                 println!("teleport_confirm: {:?}", teleport_confirm);
-
-                let client = self.clients.get_mut(client_index).unwrap();
-
-                let center_chunk_x = (client.state.coordinate.x as i32) >> 4;
-                let center_chunk_z = (client.state.coordinate.x as i32) >> 4;
-
-                let chunk = self.world.fetch_chunk(center_chunk_x, center_chunk_z)?;
-                let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
-                client.send_play_packet(packet)?;
-
-                let view_distance = 2;
-                let diff = view_distance * 1;
-                for x in center_chunk_x - diff..=center_chunk_x + diff {
-                    for z in center_chunk_z - diff..=center_chunk_z + diff {
-                        if x == center_chunk_x && z == center_chunk_z {
-                            continue;
-                        }
-                        let chunk = self.world.fetch_chunk(x, z)?;
-
-                        let packet = chunk.clone().to_packet(x, z)?;
-
-                        client.send_play_packet(packet)?;
-                    }
-                }
             }
             PlayPacket::PlayerRotation(player_rotation) => {
                 let PlayerRotation { yaw, pitch, .. } = player_rotation;
@@ -501,7 +476,27 @@ impl Server {
         play::world_border(client)?;
         play::spawn_position(client)?;
         play::play_position_and_look(client)?;
+        let center_chunk_x = (client.state.coordinate.x as i32) >> 4;
+        let center_chunk_z = (client.state.coordinate.x as i32) >> 4;
 
+        let chunk = self.world.fetch_chunk(center_chunk_x, center_chunk_z)?;
+        let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
+        client.send_play_packet(packet)?;
+
+        let view_distance = 2;
+        let diff = view_distance * 1;
+        for x in center_chunk_x - diff..=center_chunk_x + diff {
+            for z in center_chunk_z - diff..=center_chunk_z + diff {
+                if x == center_chunk_x && z == center_chunk_z {
+                    continue;
+                }
+                let chunk = self.world.fetch_chunk(x, z)?;
+
+                let packet = chunk.clone().to_packet(x, z)?;
+
+                client.send_play_packet(packet)?;
+            }
+        }
         Ok(())
     }
 }

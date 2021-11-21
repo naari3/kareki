@@ -4,7 +4,7 @@ use crate::client::Client;
 use crate::packet::client::{
     AddPlayer, DeclareCommands, DeclareRecipes, EntityStatus, HeldItemChange, JoinGame, PlayPacket,
     PlayerInfo, PlayerInfoAction, PlayerPositionAndLook, SpawnPosition, Tags, UnlockRecipes,
-    UpdateLight, UpdateViewPosition, WorldBorder, WorldBorderAction,
+    UpdateViewPosition, WorldBorder, WorldBorderAction,
 };
 
 use crate::types::position::Position;
