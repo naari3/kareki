@@ -5,8 +5,10 @@ use std::{
 };
 
 use aes::Aes128;
-use cfb8::stream_cipher::NewStreamCipher;
-use cfb8::{stream_cipher::StreamCipher, Cfb8};
+use cfb8::{
+    cipher::{AsyncStreamCipher, NewCipher},
+    Cfb8,
+};
 use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
 use flume::Sender;
 use futures_lite::FutureExt;
@@ -131,9 +133,9 @@ impl Worker {
 
     pub fn set_key(&mut self, key: &[u8]) {
         self.reader
-            .set_decryptor(AesCfb8::new_var(&key, &key).unwrap());
+            .set_decryptor(AesCfb8::new_from_slices(&key, &key).unwrap());
         self.writer
-            .set_encryptor(AesCfb8::new_var(&key, &key).unwrap());
+            .set_encryptor(AesCfb8::new_from_slices(&key, &key).unwrap());
     }
 
     pub fn set_compress(&mut self, threshold: usize) {
