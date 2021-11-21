@@ -9,6 +9,7 @@ use cfb8::stream_cipher::NewStreamCipher;
 use cfb8::{stream_cipher::StreamCipher, Cfb8};
 use flume::Sender;
 use futures_lite::FutureExt;
+use kareki_data::{block::Block, item::Item};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -29,9 +30,7 @@ use crate::{
         PacketWriteEnum,
     },
     state::{Coordinate, Rotation},
-    types::{
-        block_face::BlockFace, digging_status::DiggingStatus, position::Position, slot::Slot, Var,
-    },
+    types::{digging_status::DiggingStatus, slot::Slot, Var},
     world::World,
 };
 use crate::{
@@ -432,20 +431,22 @@ impl Server {
         };
         let item = client.state.inventory.slots[selected].clone();
 
-        if let Some(item) = item {
+        if let Some(slot) = item {
             println!("placement: {:?}", placement);
             let block_pos = placement.location.offset(placement.face);
-            println!("block_pos: {:?}, item_id: {:?}", block_pos, item.item_id);
+            let item = Item::from_id(slot.item_id.0 as _).expect("Unknown item id");
+            println!("block_pos: {:?}, item: {:?}", block_pos, item);
+            let block = Block::from_name(&item.name()).expect("Unknown block name");
             self.world.set_block(
                 block_pos.x as usize,
                 block_pos.y as usize,
                 block_pos.z as usize,
-                item.item_id.0 as u16,
+                block.default_state() as u16,
             )?;
 
             let packet = client::PlayPacket::BlockChange(BlockChange {
                 location: block_pos,
-                block_id: item.item_id,
+                block_id: Var(block.default_state() as i32),
             });
             client.send_play_packet(packet)?;
         }

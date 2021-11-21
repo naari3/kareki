@@ -1,7 +1,4 @@
-use std::{
-    fs::File,
-    io::{Read, Write},
-};
+use std::io::{Read, Write};
 
 use nbt;
 use serde::{de::DeserializeOwned, Serialize};

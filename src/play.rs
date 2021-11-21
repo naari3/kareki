@@ -87,6 +87,7 @@ pub async fn entity_status(worker: &mut Worker) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn declare_commands(worker: &mut Worker) -> Result<()> {
     let packet = PlayPacket::DeclareCommands(DeclareCommands {
         nodes: vec![],

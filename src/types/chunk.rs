@@ -22,6 +22,7 @@ impl Chunk {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_block(&self, x: usize, y: usize, z: usize) -> Option<u16> {
         match self.sections.get(y >> 4) {
             Some(section) => section.get_block(x, y % 16, z),
