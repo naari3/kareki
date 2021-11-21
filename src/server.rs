@@ -334,7 +334,7 @@ impl Server {
         let client = self.clients.get_mut(client_index).unwrap();
         client.state.coordinate = Coordinate { x, y, z };
 
-        let view_distance = 2;
+        let view_distance = 4;
         let chunk_x = x as i32 >> 4;
         let chunk_z = z as i32 >> 4;
         let last_chunk_x = client.state.last_chunk_x;
@@ -495,7 +495,7 @@ impl Server {
         let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
         client.send_play_packet(packet)?;
 
-        let view_distance = 2;
+        let view_distance = 4;
         let diff = view_distance * 1;
         for x in center_chunk_x - diff..=center_chunk_x + diff {
             for z in center_chunk_z - diff..=center_chunk_z + diff {
