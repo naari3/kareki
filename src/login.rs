@@ -121,10 +121,12 @@ pub async fn encryption_request(
 }
 
 pub async fn set_compression(worker: &mut Worker) -> Result<(), Error> {
+    let threshold = 256;
     let packet = client::LoginPacket::SetCompression(SetCompression {
-        thresshold: (-1 as i32).into(), // this mean do not compression
+        thresshold: (threshold as i32).into(),
     });
     worker.write_packet(packet).await?;
+    worker.set_compress(threshold);
 
     Ok(())
 }

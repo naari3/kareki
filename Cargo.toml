@@ -27,3 +27,4 @@ kareki-macros = { path = "macros" }
 kareki-data = { path = "data" }
 flume = "0.10.9"
 futures-lite = "1.12.0"
+flate2 = "1.0"

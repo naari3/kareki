@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Cursor, ErrorKind, Result},
+    io::{self, Cursor, ErrorKind, Read, Result, Write},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -7,6 +7,7 @@ use std::{
 use aes::Aes128;
 use cfb8::stream_cipher::NewStreamCipher;
 use cfb8::{stream_cipher::StreamCipher, Cfb8};
+use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
 use flume::Sender;
 use futures_lite::FutureExt;
 use kareki_data::{block::Block, item::Item};
@@ -44,7 +45,10 @@ use crate::{
     state::State,
     HandshakePacket,
 };
-use crate::{packet::server::PlayerPosition, protocol::ProtocolRead};
+use crate::{
+    packet::server::PlayerPosition,
+    protocol::{ProtocolLen, ProtocolRead, ProtocolWrite},
+};
 use crate::{
     packet::server::{NextState, StatusPacket},
     slp::handle_slp_status,
@@ -90,8 +94,9 @@ impl Worker {
 
         tokio::task::spawn(async move {
             let result = reader.race(writer).await.expect("task panicked");
-            if let Err(_e) = result {
+            if let Err(e) = result {
                 // disconnect
+                println!("e: {:?}", e);
             }
         });
     }
@@ -129,6 +134,11 @@ impl Worker {
             .set_decryptor(AesCfb8::new_var(&key, &key).unwrap());
         self.writer
             .set_encryptor(AesCfb8::new_var(&key, &key).unwrap());
+    }
+
+    pub fn set_compress(&mut self, threshold: usize) {
+        self.reader.compress = Some(threshold);
+        self.writer.compress = Some(threshold);
     }
 
     pub fn packets_to_send(&self) -> Sender<client::PlayPacket> {
@@ -506,6 +516,7 @@ pub struct Reader {
     buffer: Vec<u8>,
     received_packets: Sender<PlayPacket>,
     decryptor: Option<AesCfb8>,
+    compress: Option<usize>,
 }
 
 impl Reader {
@@ -515,6 +526,7 @@ impl Reader {
             buffer: vec![],
             received_packets,
             decryptor: None,
+            compress: None,
         }
     }
 
@@ -531,25 +543,60 @@ impl Reader {
     pub async fn read<P: PacketReadEnum>(&mut self) -> Result<P> {
         loop {
             let mut cursor = Cursor::new(&self.buffer[..]);
-            match <Var<i32>>::proto_decode(&mut cursor) {
-                Ok(length) => {
-                    let length: i32 = length.into();
-                    let length = length as usize;
-                    if self.buffer.len() >= length {
-                        let mut buf2 = vec![0; length];
-                        std::io::Read::read_exact(&mut cursor, &mut buf2[..])?;
-                        let mut buf2_cur = Cursor::new(buf2);
+            if let Some(threshold) = self.compress {
+                match <Var<i32>>::proto_decode(&mut cursor) {
+                    Ok(length) => {
+                        let length: i32 = length.into();
+                        let length = length as usize;
+                        if self.buffer.len() >= length {
+                            let mut buf2 = vec![0; length];
+                            std::io::Read::read_exact(&mut cursor, &mut buf2[..])?;
+                            let mut buf2_cur = Cursor::new(buf2);
 
-                        let next_cursor = cursor.position() as usize;
-                        self.buffer = self.buffer.split_off(next_cursor);
+                            let next_cursor = cursor.position() as usize;
+                            self.buffer = self.buffer.split_off(next_cursor);
 
-                        match P::packet_read(&mut buf2_cur) {
-                            Ok(packet) => return Ok(packet),
-                            Err(err) => println!("err: {:?}", err),
+                            let data_length = <Var<i32>>::proto_decode(&mut buf2_cur)?.0 as usize;
+                            let mut data = vec![];
+                            if data_length >= threshold {
+                                ZlibDecoder::new(buf2_cur).read_to_end(&mut data)?;
+                            } else {
+                                std::io::Read::read_to_end(&mut buf2_cur, &mut data)?;
+                            }
+
+                            let mut buf3_cur = Cursor::new(data);
+
+                            buf3_cur.set_position(0);
+
+                            match P::packet_read(&mut buf3_cur) {
+                                Ok(packet) => return Ok(packet),
+                                Err(err) => println!("err: {:?}", err),
+                            }
                         }
                     }
+                    Err(_) => {}
                 }
-                Err(_) => {}
+            } else {
+                match <Var<i32>>::proto_decode(&mut cursor) {
+                    Ok(length) => {
+                        let length: i32 = length.into();
+                        let length = length as usize;
+                        if self.buffer.len() >= length {
+                            let mut buf2 = vec![0; length];
+                            std::io::Read::read_exact(&mut cursor, &mut buf2[..])?;
+                            let mut buf2_cur = Cursor::new(buf2);
+
+                            let next_cursor = cursor.position() as usize;
+                            self.buffer = self.buffer.split_off(next_cursor);
+
+                            match P::packet_read(&mut buf2_cur) {
+                                Ok(packet) => return Ok(packet),
+                                Err(err) => println!("err: {:?}", err),
+                            }
+                        }
+                    }
+                    Err(_) => {}
+                }
             }
 
             let duration = Duration::from_secs(10);
@@ -576,6 +623,7 @@ pub struct Writer {
     stream: OwnedWriteHalf,
     packets_to_send: flume::Receiver<client::PlayPacket>,
     encryptor: Option<AesCfb8>,
+    compress: Option<usize>,
 }
 
 impl Writer {
@@ -587,6 +635,7 @@ impl Writer {
             stream,
             packets_to_send,
             encryptor: None,
+            compress: None,
         }
     }
 
@@ -600,6 +649,25 @@ impl Writer {
     pub async fn write<P: PacketWriteEnum>(&mut self, packet: P) -> Result<()> {
         let mut dst = Vec::new();
         packet.packet_write(&mut dst)?;
+        if let Some(threshold) = self.compress {
+            let mut dst_cur = Cursor::new(&mut dst);
+            let _original_packet_length = <Var<i32>>::proto_decode(&mut dst_cur)?;
+            let mut original_packet_data = vec![];
+            std::io::Read::read_to_end(&mut dst_cur, &mut original_packet_data)?;
+            let (data_length, compressed_data) = if original_packet_data.len() >= threshold {
+                Self::compress(original_packet_data)?
+            } else {
+                Self::uncompress(original_packet_data)?
+            };
+            let new_dst = vec![];
+            let mut new_dst_cur = Cursor::new(new_dst);
+            let packet_length =
+                <Var<i32>>::proto_len(&(data_length as i32).into()) + compressed_data.len();
+            <Var<i32>>::proto_encode(&(packet_length as i32).into(), &mut new_dst_cur)?;
+            <Var<i32>>::proto_encode(&(data_length as i32).into(), &mut new_dst_cur)?;
+            std::io::Write::write_all(&mut new_dst_cur, &compressed_data[..])?;
+            dst = new_dst_cur.into_inner();
+        }
         if let Some(encryptor) = self.encryptor.as_mut() {
             encryptor.encrypt(&mut dst);
         }
@@ -609,6 +677,16 @@ impl Writer {
 
     pub fn set_encryptor(&mut self, encryptor: AesCfb8) {
         self.encryptor = Some(encryptor);
+    }
+
+    fn compress(data: Vec<u8>) -> Result<(usize, Vec<u8>)> {
+        let mut encoder = ZlibEncoder::new(vec![], Compression::default());
+        encoder.write_all(&data[..])?;
+        Ok((data.len(), encoder.finish()?))
+    }
+
+    fn uncompress(data: Vec<u8>) -> Result<(usize, Vec<u8>)> {
+        Ok((0, data))
     }
 }
 
