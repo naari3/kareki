@@ -24,5 +24,6 @@ num-traits = "0.2"
 hematite-nbt = "0.5.2"
 bytes = "1.1.0"
 kareki-macros = { path = "macros" }
+kareki-data = { path = "data" }
 flume = "0.10.9"
 futures-lite = "1.12.0"

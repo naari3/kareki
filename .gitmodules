@@ -1,0 +1,3 @@
+[submodule "data/generator/minecraft-data"]
+	path = data/generator/minecraft-data
+	url = https://github.com/PrismarineJS/minecraft-data

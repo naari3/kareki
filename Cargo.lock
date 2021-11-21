@@ -511,6 +511,7 @@ dependencies = [
  "flume",
  "futures-lite",
  "hematite-nbt",
+ "kareki-data",
  "kareki-macros",
  "mojang-api",
  "num",
@@ -523,6 +524,10 @@ dependencies = [
  "tokio",
  "uuid",
 ]
+
+[[package]]
+name = "kareki-data"
+version = "0.1.0"
 
 [[package]]
 name = "kareki-macros"
