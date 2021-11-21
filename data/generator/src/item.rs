@@ -33,6 +33,7 @@ pub fn generate_item(version: &str) -> Result<String> {
         .map(|i| format_ident!("{}", i.name.to_case(Case::Pascal)))
         .collect::<Vec<_>>();
     let item_enum = quote! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub enum Item {
             #(
                 #item_enum_names,

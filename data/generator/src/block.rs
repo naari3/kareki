@@ -38,6 +38,7 @@ pub fn generate_block(version: &str) -> Result<String> {
         .map(|i| format_ident!("{}", i.name.to_case(Case::Pascal)))
         .collect::<Vec<_>>();
     let block_enum = quote! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub enum Block {
             #(
                 #block_enum_names,
