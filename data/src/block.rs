@@ -4105,7 +4105,7 @@ impl Block {
             Block::HoneycombBlock => "Honeycomb Block".to_string(),
         }
     }
-    pub fn stack_size(&self) -> u32 {
+    pub fn default_state(&self) -> u32 {
         match self {
             Block::Air => 0,
             Block::Stone => 1,

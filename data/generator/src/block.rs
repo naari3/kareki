@@ -139,7 +139,7 @@ pub fn generate_block(version: &str) -> Result<String> {
         }
     });
     fns.push(quote! {
-        pub fn stack_size(&self) -> u32 {
+        pub fn default_state(&self) -> u32 {
             match self {
                 #(#block_to_default_states,)*
             }
