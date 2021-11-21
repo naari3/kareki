@@ -1,7 +1,7 @@
 use std::{
     io::{self, Cursor, ErrorKind, Result},
     thread::sleep,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 
 use aes::Aes128;
@@ -22,7 +22,7 @@ use tokio::{
 use crate::{
     client::Client,
     packet::{
-        client::{BlockChange, KeepAlive, UnloadChunk},
+        client::{BlockChange, UnloadChunk},
         server::{
             CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement, PlayerDigging,
             PlayerPositionAndRotation, PlayerRotation,
@@ -209,7 +209,10 @@ impl Server {
     fn update(&mut self) -> Result<()> {
         loop {
             match self.receiver.try_recv() {
-                Ok(worker) => self.clients.push(worker),
+                Ok(mut client) => {
+                    self.handle_login_handle(&mut client)?;
+                    self.clients.push(client)
+                }
                 Err(flume::TryRecvError::Empty) => break,
                 Err(flume::TryRecvError::Disconnected) => return Ok(()),
             }
@@ -336,20 +339,6 @@ impl Server {
                 client.state.inventory.selected = slot as usize;
             }
         }
-
-        Ok(())
-    }
-
-    pub fn keep_alive(&mut self, client_index: usize) -> Result<()> {
-        let packet = client::PlayPacket::KeepAlive(KeepAlive {
-            keep_alive_id: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as i64,
-        });
-
-        let client = self.clients.get_mut(client_index).unwrap();
-        client.send_play_packet(packet)?;
 
         Ok(())
     }
@@ -482,6 +471,26 @@ impl Server {
         let x = x1 - x2;
         let z = z1 - z2;
         x.abs().max(z.abs()) as u32
+    }
+
+    fn handle_login_handle(&mut self, client: &mut Client) -> Result<()> {
+        play::join_game(client)?;
+        play::held_item_change(client)?;
+        play::declare_recipes(client)?;
+        play::tags(client)?;
+        play::entity_status(client)?;
+        // play::decrale_commands(&mut stream)?;
+        play::unlock_recipes(client)?;
+        play::play_position_and_look(client)?;
+        play::player_info(client)?;
+        play::update_view_position(client)?;
+        play::update_light(client)?;
+        // play::chunk_data(worker).await?;
+        play::world_border(client)?;
+        play::spawn_position(client)?;
+        play::play_position_and_look(client)?;
+
+        Ok(())
     }
 }
 
@@ -622,23 +631,6 @@ pub async fn handle_login_handshake(worker: &mut Worker) -> Result<()> {
             login::encryption_response(worker, encryption_response).await?;
         }
     }
-
-    play::join_game(worker).await?;
-    play::client_settings(worker).await?;
-    play::held_item_change(worker).await?;
-    play::declare_recipes(worker).await?;
-    play::tags(worker).await?;
-    play::entity_status(worker).await?;
-    // play::decrale_commands(&mut stream)?;
-    play::unlock_recipes(worker).await?;
-    play::play_position_and_look(worker).await?;
-    play::player_info(worker).await?;
-    play::update_view_position(worker).await?;
-    play::update_light(worker).await?;
-    // play::chunk_data(worker).await?;
-    play::world_border(worker).await?;
-    play::spawn_position(worker).await?;
-    play::play_position_and_look(worker).await?;
 
     Ok(())
 }

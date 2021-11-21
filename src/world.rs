@@ -58,6 +58,7 @@ impl World {
         Ok(chunk)
     }
 
+    #[allow(dead_code)]
     pub fn get_block(&mut self, x: usize, y: usize, z: usize) -> Result<Option<u16>> {
         let chunk_x = (x >> 4) as i32;
         let chunk_z = (z >> 4) as i32;
