@@ -52,15 +52,15 @@ impl ChunkSection {
     }
 
     pub fn make_palette(&self) -> Vec<Var<i32>> {
-        let mut palette = self
-            .data
-            .iter()
-            .collect::<HashSet<_>>()
+        let mut palette_set = self.data.iter().map(|&n| n).collect::<HashSet<_>>();
+        palette_set.insert(0);
+        // must have Air
+
+        let palette = palette_set
             .into_iter()
-            .map(|&n| Var(n as i32))
+            .map(|n| Var(n as i32))
             .collect::<Vec<_>>();
-        palette.sort_unstable();
-        palette.insert(0, 0.into());
+
         palette
     }
 
