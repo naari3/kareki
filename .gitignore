@@ -3,3 +3,4 @@ target
 sandbox
 Cargo.lock
 flamegraph.svg
+cargo-flamegraph.stacks
