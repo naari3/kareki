@@ -1,5 +1,7 @@
 use std::{collections::HashMap, io::Result};
 
+use kareki_data::block::Block;
+
 use crate::types::chunk::Chunk;
 
 #[derive(Debug, Clone, Default)]
@@ -14,9 +16,12 @@ impl World {
         for x in 0..16 {
             for z in 0..16 {
                 for y in 0..16 {
-                    if (x + y + z) / 4 % 3 != 0 {
-                        default_chunk.set_block(x, y, z, (((x + y + z) % 8) + 1) as u16)?;
-                    }
+                    let block = if y == 15 {
+                        Block::GrassBlock
+                    } else {
+                        Block::Dirt
+                    };
+                    default_chunk.set_block(x, y, z, block)?;
                 }
             }
         }
@@ -34,18 +39,20 @@ impl World {
         let chunk = self
             .chunks
             .entry((chunk_x, chunk_z))
-            .or_insert(Self::generate_chunk()?);
+            .or_insert(Self::generate_chunk(chunk_x, chunk_z)?);
 
         Ok(chunk)
     }
 
-    fn generate_chunk() -> Result<Chunk> {
+    fn generate_chunk(_chunk_x: i32, _chunk_z: i32) -> Result<Chunk> {
         let mut chunk = Chunk::empty();
         for x in 0..16 {
             for z in 0..16 {
                 for y in 0..16 {
                     if (x + y + z) / 4 % 3 != 0 {
-                        chunk.set_block(x, y, z, (((x + y + z) % 8) + 1) as u16)?;
+                        let block = Block::from_id((((x + y + z) % 13) + 1) as u32)
+                            .expect("Unknown block id");
+                        chunk.set_block(x, y, z, block)?;
                     }
                 }
             }
@@ -71,14 +78,14 @@ impl World {
         }
     }
 
-    pub fn set_block(&mut self, x: usize, y: usize, z: usize, block_id: u16) -> Result<()> {
+    pub fn set_block(&mut self, x: usize, y: usize, z: usize, block: Block) -> Result<()> {
         let chunk_x = (x >> 4) as i32;
         let chunk_z = (z >> 4) as i32;
 
         let chunk = self.get_chunk(chunk_x, chunk_z)?;
 
         match chunk {
-            Some(chunk) => chunk.set_block(x & 0b1111, y, z & 0b1111, block_id),
+            Some(chunk) => chunk.set_block(x & 0b1111, y, z & 0b1111, block),
             None => return Ok(()),
         }
     }

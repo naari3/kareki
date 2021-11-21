@@ -22,7 +22,7 @@ use tokio::{
 use crate::{
     client::Client,
     packet::{
-        client::{BlockChange, UnloadChunk},
+        client::{BlockChange, UnloadChunk, UpdateLight},
         server::{
             CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement, PlayerDigging,
             PlayerPositionAndRotation, PlayerRotation,
@@ -376,6 +376,20 @@ impl Server {
                         let packet = chunk.clone().to_packet(x, z)?;
 
                         client.send_play_packet(packet)?;
+
+                        let sky_light_mask = 0b111111111111111111;
+                        let block_light_mask = 0b111111111111111111;
+                        let packet = client::PlayPacket::UpdateLight(UpdateLight {
+                            chunk_x: x.into(),
+                            chunk_z: z.into(),
+                            sky_light_mask: sky_light_mask.into(),
+                            block_light_mask: block_light_mask.into(),
+                            empty_sky_light_mask: Var(!sky_light_mask),
+                            empty_block_light_mask: Var(!block_light_mask),
+                            sky_lights: vec![vec![0xff; 2048]; 18],
+                            block_lights: vec![vec![0xff; 2048]; 18],
+                        });
+                        client.send_play_packet(packet)?;
                     } else if was_loaded && !should_be_loaded {
                         // println!("unload x: {:?} z: {:?}", x, z);
                         let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
@@ -430,7 +444,7 @@ impl Server {
                 block_pos.x as usize,
                 block_pos.y as usize,
                 block_pos.z as usize,
-                block.default_state() as u16,
+                block,
             )?;
 
             let packet = client::PlayPacket::BlockChange(BlockChange {
@@ -455,7 +469,7 @@ impl Server {
                 digging.location.x as usize,
                 digging.location.y as usize,
                 digging.location.z as usize,
-                0,
+                Block::Air,
             )?;
             let packet = client::PlayPacket::BlockChange(BlockChange {
                 location: digging.location,
@@ -484,8 +498,6 @@ impl Server {
         play::play_position_and_look(client)?;
         play::player_info(client)?;
         play::update_view_position(client)?;
-        play::update_light(client)?;
-        // play::chunk_data(worker).await?;
         play::world_border(client)?;
         play::spawn_position(client)?;
         play::play_position_and_look(client)?;

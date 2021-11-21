@@ -2,6 +2,8 @@ use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Result;
 
+use kareki_data::block::Block;
+
 use crate::packet::client;
 use crate::packet::client::ChunkData;
 use crate::protocol::ProtocolWrite;
@@ -30,7 +32,11 @@ impl Chunk {
         }
     }
 
-    pub fn set_block(&mut self, x: usize, y: usize, z: usize, block_id: u16) -> Result<()> {
+    pub fn set_block(&mut self, x: usize, y: usize, z: usize, block: Block) -> Result<()> {
+        self.set_block_raw(x, y, z, block.default_state() as u16)
+    }
+
+    pub fn set_block_raw(&mut self, x: usize, y: usize, z: usize, block_id: u16) -> Result<()> {
         match self.sections.get_mut(y >> 4) {
             Some(section) => section.set_block(x, y % 16, z, block_id),
             None => Err(Error::new(ErrorKind::InvalidInput, "out of index")),

@@ -217,7 +217,7 @@ impl ProtocolWrite for ChunkData {
     }
 }
 
-#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[derive(Debug, Clone, PacketWrite)]
 #[packet_id = 0x25]
 pub struct UpdateLight {
     pub chunk_x: Var<i32>,
@@ -226,8 +226,27 @@ pub struct UpdateLight {
     pub block_light_mask: Var<i32>,
     pub empty_sky_light_mask: Var<i32>,
     pub empty_block_light_mask: Var<i32>,
-    pub sky_lights: Vec<u8>,
-    pub block_lights: Vec<u8>,
+    pub sky_lights: Vec<Vec<u8>>,
+    pub block_lights: Vec<Vec<u8>>,
+}
+
+impl ProtocolWrite for UpdateLight {
+    fn proto_encode<D: Write>(value: &Self, dst: &mut D) -> io::Result<()> {
+        <Var<i32>>::proto_encode(&value.chunk_x, dst)?;
+        <Var<i32>>::proto_encode(&value.chunk_z, dst)?;
+        <Var<i32>>::proto_encode(&value.sky_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.block_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.empty_sky_light_mask, dst)?;
+        <Var<i32>>::proto_encode(&value.empty_block_light_mask, dst)?;
+        for sky_light in value.sky_lights.iter() {
+            <Arr<Var<i32>, u8>>::proto_encode(sky_light, dst)?;
+        }
+        for block_light in value.block_lights.iter() {
+            <Arr<Var<i32>, u8>>::proto_encode(block_light, dst)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]

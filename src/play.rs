@@ -138,22 +138,6 @@ pub fn update_view_position(client: &mut Client) -> Result<()> {
     Ok(())
 }
 
-pub fn update_light(client: &mut Client) -> Result<()> {
-    let packet = PlayPacket::UpdateLight(UpdateLight {
-        chunk_x: 0.into(),
-        chunk_z: 0.into(),
-        sky_light_mask: 3.into(),
-        block_light_mask: 0.into(),
-        empty_sky_light_mask: 0.into(),
-        empty_block_light_mask: 0.into(),
-        sky_lights: vec![127; 2048],
-        block_lights: vec![127; 2048],
-    });
-    client.send_play_packet(packet)?;
-
-    Ok(())
-}
-
 pub fn world_border(client: &mut Client) -> Result<()> {
     let packet = PlayPacket::WorldBorder(WorldBorder {
         action: WorldBorderAction::SetSize { diameter: 128.0 },
