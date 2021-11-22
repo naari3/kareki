@@ -17,6 +17,7 @@ pub struct State {
     pub last_keep_alive: Instant,
     pub last_chunk_x: i32,
     pub last_chunk_z: i32,
+    pub view_distance: usize,
 }
 
 impl Default for State {
@@ -32,6 +33,7 @@ impl Default for State {
             last_keep_alive: Instant::now(),
             last_chunk_x: 0,
             last_chunk_z: 0,
+            view_distance: 0,
         }
     }
 }

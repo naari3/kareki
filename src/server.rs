@@ -27,8 +27,8 @@ use crate::{
     packet::{
         client::{BlockChange, UnloadChunk, UpdateLight},
         server::{
-            CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement, PlayerDigging,
-            PlayerPositionAndRotation, PlayerRotation,
+            ClientSettings, CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement,
+            PlayerDigging, PlayerPositionAndRotation, PlayerRotation,
         },
         PacketWriteEnum,
     },
@@ -97,7 +97,8 @@ impl Worker {
         tokio::task::spawn(async move {
             let result = reader.race(writer).await.expect("task panicked");
             if let Err(e) = result {
-                // disconnect
+                // TODO: disconnect
+
                 println!("e: {:?}", e);
             }
         });
@@ -243,7 +244,7 @@ impl Server {
                             will_remove.push(index);
                         }
                     }
-                    println!("err: {:?}", err);
+                    println!("err update loop: {:?}", err);
                 }
             }
         }
@@ -270,7 +271,7 @@ impl Server {
     fn handle_packet(&mut self, client_index: usize, packet: PlayPacket) -> Result<()> {
         match packet {
             PlayPacket::ClientSettings(client_settings) => {
-                println!("client settings: {:?}", client_settings);
+                self.handle_client_settings(client_index, &client_settings)?;
             }
             PlayPacket::KeepAlive(_keep_alive) => {}
             PlayPacket::PlayerPosition(player_position) => {
@@ -334,7 +335,7 @@ impl Server {
         let client = self.clients.get_mut(client_index).unwrap();
         client.state.coordinate = Coordinate { x, y, z };
 
-        let view_distance = 4;
+        let view_distance = client.state.view_distance as i32;
         let chunk_x = x as i32 >> 4;
         let chunk_z = z as i32 >> 4;
         let last_chunk_x = client.state.last_chunk_x;
@@ -357,7 +358,6 @@ impl Server {
                         Self::get_chunk_distance(x, z, chunk_x, chunk_z) <= view_distance as u32;
 
                     if !was_loaded && should_be_loaded {
-                        // println!("load x: {:?} z: {:?}", x, z);
                         let chunk = self.world.fetch_chunk(x, z)?;
 
                         let packet = chunk.clone().to_packet(x, z)?;
@@ -378,7 +378,6 @@ impl Server {
                         });
                         client.send_play_packet(packet)?;
                     } else if was_loaded && !should_be_loaded {
-                        // println!("unload x: {:?} z: {:?}", x, z);
                         let packet = client::PlayPacket::UnloadChunk(UnloadChunk {
                             chunk_x: x,
                             chunk_z: z,
@@ -405,6 +404,38 @@ impl Server {
     ) -> Result<()> {
         let client = self.clients.get_mut(client_index).unwrap();
         client.state.inventory.slots[slot_number] = item;
+        Ok(())
+    }
+
+    pub fn handle_client_settings(
+        &mut self,
+        client_index: usize,
+        settings: &ClientSettings,
+    ) -> Result<()> {
+        println!("settings: {:?}", settings);
+        let client = self.clients.get_mut(client_index).unwrap();
+        client.state.view_distance = settings.view_distance as usize;
+        let view_distance = client.state.view_distance as i32;
+        let diff = view_distance * 2;
+        let center_chunk_x = (client.state.coordinate.x as i32) >> 4;
+        let center_chunk_z = (client.state.coordinate.x as i32) >> 4;
+
+        let chunk = self.world.fetch_chunk(center_chunk_x, center_chunk_z)?;
+        let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
+        client.send_play_packet(packet)?;
+        for x in center_chunk_x - diff..=center_chunk_x + diff {
+            for z in center_chunk_z - diff..=center_chunk_z + diff {
+                if x == center_chunk_x && z == center_chunk_z {
+                    continue;
+                }
+                let chunk = self.world.fetch_chunk(x, z)?;
+
+                let packet = chunk.clone().to_packet(x, z)?;
+
+                client.send_play_packet(packet)?;
+            }
+        }
+
         Ok(())
     }
 
@@ -485,30 +516,10 @@ impl Server {
         play::play_position_and_look(client)?;
         play::player_info(client)?;
         play::update_view_position(client)?;
-        play::world_border(client)?;
+        // play::world_border(client)?;
         play::spawn_position(client)?;
         play::play_position_and_look(client)?;
-        let center_chunk_x = (client.state.coordinate.x as i32) >> 4;
-        let center_chunk_z = (client.state.coordinate.x as i32) >> 4;
 
-        let chunk = self.world.fetch_chunk(center_chunk_x, center_chunk_z)?;
-        let packet = chunk.clone().to_packet(center_chunk_x, center_chunk_z)?;
-        client.send_play_packet(packet)?;
-
-        let view_distance = 4;
-        let diff = view_distance * 1;
-        for x in center_chunk_x - diff..=center_chunk_x + diff {
-            for z in center_chunk_z - diff..=center_chunk_z + diff {
-                if x == center_chunk_x && z == center_chunk_z {
-                    continue;
-                }
-                let chunk = self.world.fetch_chunk(x, z)?;
-
-                let packet = chunk.clone().to_packet(x, z)?;
-
-                client.send_play_packet(packet)?;
-            }
-        }
         Ok(())
     }
 }
