@@ -138,6 +138,7 @@ pub fn update_view_position(client: &mut Client) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn world_border(client: &mut Client) -> Result<()> {
     let packet = PlayPacket::WorldBorder(WorldBorder {
         action: WorldBorderAction::SetSize { diameter: 128.0 },

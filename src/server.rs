@@ -10,7 +10,7 @@ use cfb8::{
     Cfb8,
 };
 use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
-use flume::Sender;
+use flume::{Receiver, Sender, TryRecvError};
 use futures_lite::FutureExt;
 use kareki_data::{block::Block, item::Item};
 use tokio::{
@@ -25,7 +25,7 @@ use tokio::{
 use crate::{
     client::Client,
     packet::{
-        client::{BlockChange, UnloadChunk, UpdateLight},
+        client::{BlockChange, PlayDisconnect, UnloadChunk, UpdateLight},
         server::{
             ClientSettings, CreativeInventoryAction, HeldItemChange, PlayerBlockPlacement,
             PlayerDigging, PlayerPositionAndRotation, PlayerRotation,
@@ -64,7 +64,7 @@ pub struct Worker {
     writer: Writer,
     pub state: State,
     packets_to_send_tx: Sender<client::PlayPacket>,
-    received_packets_rx: flume::Receiver<PlayPacket>,
+    received_packets_rx: Receiver<PlayPacket>,
 }
 
 pub enum NextConnect {
@@ -148,14 +148,14 @@ impl Worker {
         self.packets_to_send_tx.clone()
     }
 
-    pub fn received_packets(&self) -> flume::Receiver<PlayPacket> {
+    pub fn received_packets(&self) -> Receiver<PlayPacket> {
         self.received_packets_rx.clone()
     }
 }
 
 pub struct Server {
     clients: Vec<Client>,
-    receiver: flume::Receiver<Client>,
+    receiver: Receiver<Client>,
     world: World,
 }
 
@@ -226,29 +226,33 @@ impl Server {
                     self.handle_login_handle(&mut client)?;
                     self.clients.push(client)
                 }
-                Err(flume::TryRecvError::Empty) => break,
-                Err(flume::TryRecvError::Disconnected) => return Ok(()),
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => return Ok(()),
             }
         }
-        let mut will_remove = vec![];
+        let mut will_removes = vec![];
         let max_client_id = self.clients.len();
         for index in 0..max_client_id {
+            let mut will_remove = false;
             match self.update_play(index) {
                 Ok(_) => {}
                 Err(err) => {
                     match err.kind() {
-                        ErrorKind::BrokenPipe => {
-                            will_remove.push(index);
-                        }
                         _ => {
-                            will_remove.push(index);
+                            will_remove = true;
                         }
                     }
                     println!("err update loop: {:?}", err);
                 }
             }
+            if self.clients[index].is_disconnected() {
+                will_remove = true;
+            }
+            if will_remove {
+                will_removes.push(index);
+            }
         }
-        for index in will_remove {
+        for index in will_removes {
             self.clients.remove(index);
         }
 
@@ -334,6 +338,14 @@ impl Server {
     pub fn set_position(&mut self, client_index: usize, x: f64, y: f64, z: f64) -> Result<()> {
         let client = self.clients.get_mut(client_index).unwrap();
         client.state.coordinate = Coordinate { x, y, z };
+
+        if y < -16.0 {
+            let packet = client::PlayPacket::Disconnect(PlayDisconnect {
+                reason: r#"{"text": "you are dead ( ; _ ; )"}"#.to_string(),
+            });
+            client.send_play_packet(packet)?;
+            client.is_disconnected.set(true);
+        }
 
         let view_distance = client.state.view_distance as i32;
         let chunk_x = x as i32 >> 4;
@@ -634,16 +646,13 @@ impl Reader {
 
 pub struct Writer {
     stream: OwnedWriteHalf,
-    packets_to_send: flume::Receiver<client::PlayPacket>,
+    packets_to_send: Receiver<client::PlayPacket>,
     encryptor: Option<AesCfb8>,
     compress: Option<usize>,
 }
 
 impl Writer {
-    pub fn new(
-        stream: OwnedWriteHalf,
-        packets_to_send: flume::Receiver<client::PlayPacket>,
-    ) -> Self {
+    pub fn new(stream: OwnedWriteHalf, packets_to_send: Receiver<client::PlayPacket>) -> Self {
         Self {
             stream,
             packets_to_send,

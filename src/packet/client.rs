@@ -86,8 +86,9 @@ pub struct SetCompression {
 pub enum PlayPacket {
     BlockChange(BlockChange),                     // 0x0C
     DeclareCommands(DeclareCommands),             // 0x12
-    UnloadChunk(UnloadChunk),                     // 0x1E
+    Disconnect(PlayDisconnect),                   // 0x1B
     EntityStatus(EntityStatus),                   // 0x1C
+    UnloadChunk(UnloadChunk),                     // 0x1E
     KeepAlive(KeepAlive),                         // 0x21
     ChunkData(ChunkData),                         // 0x22
     UpdateLight(UpdateLight),                     // 0x25
@@ -107,6 +108,7 @@ impl PacketWriteEnum for PlayPacket {
         match self {
             PlayPacket::BlockChange(packet) => packet.packet_write(dst),
             PlayPacket::DeclareCommands(packet) => packet.packet_write(dst),
+            PlayPacket::Disconnect(packet) => packet.packet_write(dst),
             PlayPacket::EntityStatus(packet) => packet.packet_write(dst),
             PlayPacket::UnloadChunk(packet) => packet.packet_write(dst),
             PlayPacket::KeepAlive(packet) => packet.packet_write(dst),
@@ -161,6 +163,12 @@ impl ProtocolWrite for Node {
         Option::proto_encode(&value.suggestions_type, dst)?;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, ProtocolWrite, PacketWrite)]
+#[packet_id = 0x1B]
+pub struct PlayDisconnect {
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, ProtocolWrite, PacketWrite)]

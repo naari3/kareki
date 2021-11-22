@@ -1,5 +1,5 @@
 use flume::{Receiver, Sender};
-use std::{io::Result, time::SystemTime};
+use std::{cell::Cell, io::Result, time::SystemTime};
 
 use crate::{
     packet::{
@@ -13,6 +13,7 @@ pub struct Client {
     packets_to_send_tx: Sender<client::PlayPacket>,
     received_packets_rx: Receiver<server::PlayPacket>,
     pub state: State,
+    pub is_disconnected: Cell<bool>,
 }
 
 impl Client {
@@ -25,6 +26,7 @@ impl Client {
             packets_to_send_tx,
             received_packets_rx,
             state,
+            is_disconnected: Cell::new(false),
         }
     }
 
@@ -33,6 +35,10 @@ impl Client {
             .try_iter()
             .collect::<Vec<_>>()
             .clone()
+    }
+
+    pub fn is_disconnected(&self) -> bool {
+        self.received_packets_rx.is_disconnected() || self.is_disconnected.get()
     }
 
     pub fn send_play_packet(&self, packet: client::PlayPacket) -> Result<()> {
