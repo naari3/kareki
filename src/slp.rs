@@ -1,7 +1,6 @@
 use std::io::Error;
 
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::packet::client::{self, Pong, SlpResponse};
 use crate::packet::server::{Ping, Request};
@@ -31,28 +30,13 @@ pub struct Version {
     pub protocol: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct StatusResponse {
     pub description: Description,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub favicon: Option<String>,
     pub players: Players,
     pub version: Version,
-}
-
-impl Serialize for StatusResponse {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_struct("StatusResponse", 3)?;
-        s.serialize_field("description", &self.description)?;
-        if self.favicon.is_some() {
-            s.serialize_field("favicon", &self.favicon)?;
-        }
-        s.serialize_field("players", &self.players)?;
-        s.serialize_field("version", &self.version)?;
-        s.end()
-    }
 }
 
 pub async fn handle_slp_status(worker: &mut Worker, _request: Request) -> Result<(), Error> {
